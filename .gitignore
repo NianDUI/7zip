@@ -1,0 +1,8 @@
+# 构建产物（make 输出目录，如 b/m_arm64、b/m_x64）
+b/
+
+# 构建期生成的导出清单（权威副本在 Mac/poc/exports7z.txt）
+/CPP/7zip/Bundles/Format7zF/exports7z.txt
+
+# macOS 桌面元数据
+.DS_Store

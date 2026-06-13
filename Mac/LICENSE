@@ -1,0 +1,32 @@
+7-Zip macOS 移植 —— Mac/ 目录新增代码的许可
+=============================================
+
+本 `Mac/` 目录下的全部新增代码（SevenZipKit 桥接层、SevenZipFM 应用、
+PoC、构建脚本与 mac 专用 makefile 片段）采用：
+
+    SPDX-License-Identifier: LGPL-2.1-or-later
+
+为什么是 LGPL：这些代码 #include 了 7-Zip 的 C++ 接口头，并在编译期
+静态链接了上游 LGPL 代码（CPP/7zip/UI/Common 与 CPP/7zip/UI/Agent），
+因此构成 7-Zip 的派生作品，沿用其 GNU LGPL 2.1（或更新版本）许可。
+
+LGPL 2.1 许可正文见仓库内 `DOC/copying.txt`。
+
+
+本仓库其余部分（即上游 7-Zip 源码）许可
+----------------------------------------
+- 大部分代码：GNU LGPL 2.1            —— DOC/copying.txt（全文）、DOC/License.txt
+- 部分代码：BSD 3-clause / 2-clause   —— DOC/License.txt（LZFSE/ZSTD/XXH64 等）
+- unRAR 相关代码：附加限制             —— DOC/unRarLicense.txt
+  Copyright (C) 1999-2026 Igor Pavlov.
+
+
+声明
+----
+- 本移植为独立的第三方作品，**非** Igor Pavlov / 7-zip.org 官方出品，亦未获其背书。
+- unRAR 代码（若编入）**不得用于重建 RAR (WinRAR) 兼容的压缩算法**。
+  如需彻底移除 RAR 解码，按 docs/02-core-bridge.md §1.5 用 DISABLE_RAR=1 构建。
+
+> 注：以上义务在向第三方“分发”时才具法律约束力。若本仓库仅作私有
+> （private）托管或纯自用，不构成分发，可不受这些义务约束（见
+> docs/05-roadmap-execution.md §10.6）。本文件随仓库保留为良好实践。
