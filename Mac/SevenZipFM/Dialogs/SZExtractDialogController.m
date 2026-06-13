@@ -125,7 +125,9 @@ static NSMutableSet *g_alive;
     [col.trailingAnchor constraintEqualToAnchor:_window.contentView.trailingAnchor],
     [col.topAnchor constraintEqualToAnchor:_window.contentView.topAnchor],
     [col.bottomAnchor constraintEqualToAnchor:_window.contentView.bottomAnchor],
-    [destRow.widthAnchor constraintEqualToAnchor:grid.widthAnchor],
+    // 让 grid/按钮行撑满对话框内宽（col.width 减去左右各 18 的 edgeInsets），
+    // grid 第 1 列(控件列)为 Fill，于是目标框/下拉随之变宽，路径不再被压窄。
+    [grid.widthAnchor constraintEqualToAnchor:col.widthAnchor constant:-36],
     [btnRow.widthAnchor constraintEqualToAnchor:col.widthAnchor constant:-36],
   ]];
 }
@@ -138,11 +140,13 @@ static NSMutableSet *g_alive;
   p.canChooseFiles = NO;
   p.canCreateDirectories = YES;
   p.prompt = @"选择";
+  p.message = @"选择解压目标目录";
   NSString *cur = _destCombo.stringValue;
   if (cur.length) p.directoryURL = [NSURL fileURLWithPath:cur];
-  [p beginSheetModalForWindow:_window completionHandler:^(NSModalResponse r) {
-    if (r == NSModalResponseOK && p.URL) self->_destCombo.stringValue = p.URL.path;
-  }];
+  // 用独立 runModal（非 sheet）：作为小对话框的 sheet 会被父窗尺寸压缩成简化工具栏，
+  // 独立弹出才是标准全尺寸 Finder 面板（完整视图切换/列头/侧栏）。
+  if ([p runModal] == NSModalResponseOK && p.URL)
+    _destCombo.stringValue = p.URL.path;
 }
 
 - (void)onCancel:(id)sender {
