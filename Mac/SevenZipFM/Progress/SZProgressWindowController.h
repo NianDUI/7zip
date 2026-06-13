@@ -14,6 +14,11 @@ NS_ASSUME_NONNULL_BEGIN
                    password:(nullable NSString *)password
                  completion:(nullable void (^)(BOOL ok))completion;
 
+/// 测试模式（testMode）：校验完整性不落盘，destDir 忽略。完成弹「没有错误」或错误汇总。
+- (void)beginTestArchive:(NSString *)archivePath
+                password:(nullable NSString *)password
+              completion:(nullable void (^)(BOOL ok))completion;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -68,7 +68,15 @@
   scroll.autohidesScrollers = YES;
   scroll.borderType = NSBezelBorder;
 
-  NSStackView *stack = [NSStackView stackViewWithViews:@[_address, scroll, _status]];
+  // 工具栏按钮 + 地址栏同一行（解压/测试可见可点；Windows 7zFM 工具栏的简化）。
+  NSButton *extractBtn = [NSButton buttonWithTitle:@"解压" target:self action:@selector(extractTo:)];
+  NSButton *testBtn    = [NSButton buttonWithTitle:@"测试" target:self action:@selector(testArchive:)];
+  [_address setContentHuggingPriority:1 forOrientation:NSLayoutConstraintOrientationHorizontal];
+  NSStackView *topRow = [NSStackView stackViewWithViews:@[extractBtn, testBtn, _address]];
+  topRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+  topRow.spacing = 8;
+
+  NSStackView *stack = [NSStackView stackViewWithViews:@[topRow, scroll, _status]];
   stack.orientation = NSUserInterfaceLayoutOrientationVertical;
   stack.spacing = 4;
   stack.edgeInsets = NSEdgeInsetsMake(8, 8, 8, 8);
@@ -121,6 +129,7 @@
   _panel.onReload = ^{ [weakSelf refreshChrome]; };
   [_panel bindTableView:_table];
   [self refreshChrome];
+  [_window makeFirstResponder:_table];   // 让 Backspace/Enter 键盘导航生效（修返回上级）
 }
 
 - (void)refreshChrome {
@@ -149,9 +158,17 @@
   [pc beginExtractArchive:_archiveURL.path toDirectory:p.URL.path password:nil completion:nil];
 }
 
+// 测试归档完整性（testMode，不落盘）
+- (void)testArchive:(id)sender {
+  if (!_archiveURL) { NSBeep(); return; }
+  SZProgressWindowController *pc = [SZProgressWindowController new];
+  [pc beginTestArchive:_archiveURL.path password:nil completion:nil];
+}
+
 // 仅在已打开归档时启用菜单项
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
-  if (item.action == @selector(extractTo:)) return _archiveURL != nil;
+  if (item.action == @selector(extractTo:) || item.action == @selector(testArchive:))
+    return _archiveURL != nil;
   return YES;
 }
 

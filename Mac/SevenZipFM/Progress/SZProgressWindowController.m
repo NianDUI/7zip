@@ -25,6 +25,8 @@
 
   BOOL _finished;
   BOOL _cancelled;
+  BOOL _testMode;
+  NSString *_verb;          // "解压" / "测试"
   NSString *_archiveName;
   void (^_completion)(BOOL);
 }
@@ -36,17 +38,34 @@ static NSMutableSet *g_alive;
                 toDirectory:(NSString *)destDir
                    password:(NSString *)password
                  completion:(void (^)(BOOL))completion {
+  [self beginArchive:archivePath toDirectory:destDir testMode:NO password:password completion:completion];
+}
+
+- (void)beginTestArchive:(NSString *)archivePath
+                password:(NSString *)password
+              completion:(void (^)(BOOL))completion {
+  [self beginArchive:archivePath toDirectory:nil testMode:YES password:password completion:completion];
+}
+
+- (void)beginArchive:(NSString *)archivePath
+         toDirectory:(NSString *)destDir
+            testMode:(BOOL)testMode
+            password:(NSString *)password
+          completion:(void (^)(BOOL))completion {
   if (!g_alive) g_alive = [NSMutableSet new];
   [g_alive addObject:self];
   _completion = [completion copy];
   _archiveName = archivePath.lastPathComponent;
+  _testMode = testMode;
+  _verb = testMode ? @"测试" : @"解压";
   _startDate = [NSDate date];
 
   [self buildWindow];
   [_window makeKeyAndOrderFront:nil];
 
   SZArchiveExtractOptions *opts = [SZArchiveExtractOptions new];
-  opts.outputDirectory = destDir;
+  opts.testMode = testMode;
+  if (!testMode) opts.outputDirectory = destDir;
   opts.pathMode = SZExtractPathModeFull;
   opts.overwriteMode = SZExtractOverwriteModeAsk;   // 触发 delegate askOverwrite
   if (password.length) opts.password = password;
@@ -69,10 +88,10 @@ static NSMutableSet *g_alive;
   _window = [[NSWindow alloc] initWithContentRect:frame
       styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskMiniaturizable)
       backing:NSBackingStoreBuffered defer:NO];
-  _window.title = [NSString stringWithFormat:@"解压 %@", _archiveName];
+  _window.title = [NSString stringWithFormat:@"%@ %@", _verb, _archiveName];
   [_window center];
 
-  _titleLabel = [NSTextField labelWithString:@"正在解压…"];
+  _titleLabel = [NSTextField labelWithString:[NSString stringWithFormat:@"正在%@…", _verb]];
   _titleLabel.font = [NSFont boldSystemFontOfSize:13];
 
   _fileLabel = [NSTextField labelWithString:@""];
@@ -138,7 +157,7 @@ static NSString *FormatElapsed(NSTimeInterval s) {
   if (_currentFile) _fileLabel.stringValue = _currentFile;
 
   const int pct = _totalBytes ? (int)(100.0 * _completedBytes / _totalBytes) : 0;
-  _window.title = [NSString stringWithFormat:@"%d%%  解压 %@", pct, _archiveName];
+  _window.title = [NSString stringWithFormat:@"%d%%  %@ %@", pct, _verb, _archiveName];
 }
 
 #pragma mark - 取消
@@ -155,12 +174,20 @@ static NSString *FormatElapsed(NSTimeInterval s) {
   [_timer invalidate]; _timer = nil;
   [_window orderOut:nil];
 
-  if (!ok && !_cancelled && em.length) {
-    NSAlert *a = [NSAlert new];
-    a.messageText = @"解压未完全成功";
-    a.informativeText = em;
-    [a addButtonWithTitle:@"好"];
-    [a runModal];
+  if (!_cancelled) {
+    if (!ok && em.length) {
+      NSAlert *a = [NSAlert new];
+      a.messageText = [NSString stringWithFormat:@"%@未完全成功", _verb];
+      a.informativeText = em;
+      [a addButtonWithTitle:@"好"];
+      [a runModal];
+    } else if (ok && _testMode) {
+      NSAlert *a = [NSAlert new];        // 对齐 7zz t 的「没有错误」
+      a.messageText = @"测试完成";
+      a.informativeText = [NSString stringWithFormat:@"「%@」没有错误。", _archiveName];
+      [a addButtonWithTitle:@"好"];
+      [a runModal];
+    }
   }
   if (_completion) _completion(ok);
   [g_alive removeObject:self];   // 释放自持
