@@ -15,9 +15,9 @@ int main(int argc, const char **argv) {
     NSMenuItem *appItem = [NSMenuItem new];
     [mainMenu addItem:appItem];
     NSMenu *appMenu = [NSMenu new];
-    [appMenu addItemWithTitle:@"关于 SevenZipFM" action:NULL keyEquivalent:@""];
+    [appMenu addItemWithTitle:@"关于 7-Zip" action:NULL keyEquivalent:@""];
     [appMenu addItem:[NSMenuItem separatorItem]];
-    [appMenu addItemWithTitle:@"退出 SevenZipFM" action:@selector(terminate:) keyEquivalent:@"q"];
+    [appMenu addItemWithTitle:@"退出 7-Zip" action:@selector(terminate:) keyEquivalent:@"q"];
     appItem.submenu = appMenu;
     app.mainMenu = mainMenu;
 

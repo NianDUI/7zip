@@ -9,7 +9,9 @@ FM="$REPO/Mac/SevenZipFM"
 ALONE="$CPP/7zip/Bundles/Alone2/b/m_arm64"
 SHIM="$REPO/Mac/compat/win_compat_mac.h"
 OUT=/tmp/szfm_app; mkdir -p "$OUT"
-APP="$OUT/SevenZipFM.app"
+# .app bundle 名 = Windows 安装后应用名「7-Zip File Manager」；可执行/Bundle ID 保持 SevenZipFM（内部）
+APP="$OUT/7-Zip File Manager.app"
+rm -rf "$OUT/SevenZipFM.app"   # 清理旧名
 cd "$CPP"
 [ -d "$ALONE" ] || { echo "缺 Alone2 对象集：cd CPP/7zip/Bundles/Alone2 && make -f ../../cmpl_mac_arm64.mak -j8"; exit 1; }
 

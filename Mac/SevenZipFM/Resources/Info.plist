@@ -2,8 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key>           <string>SevenZipFM</string>
-  <key>CFBundleDisplayName</key>    <string>SevenZipFM</string>
+  <key>CFBundleName</key>           <string>7-Zip</string>
+  <key>CFBundleDisplayName</key>    <string>7-Zip File Manager</string>
   <key>CFBundleExecutable</key>     <string>SevenZipFM</string>
   <key>CFBundleIdentifier</key>     <string>com.niandui.SevenZipFM</string>
   <key>CFBundleVersion</key>        <string>0.1</string>

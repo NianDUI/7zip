@@ -43,7 +43,7 @@
       styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                  NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable)
       backing:NSBackingStoreBuffered defer:NO];
-  _window.title = @"SevenZipFM";
+  _window.title = @"7-Zip";   // 对齐 Windows 版窗口标题（FM.cpp:247）
   _window.frameAutosaveName = @"SZMainWindow";
   [_window center];
 
@@ -125,7 +125,7 @@
 - (void)refreshChrome {
   _address.stringValue = _panel.addressText;
   _status.stringValue = _panel.statusText;
-  _window.title = [NSString stringWithFormat:@"SevenZipFM — %@", _archiveURL.lastPathComponent];
+  _window.title = [NSString stringWithFormat:@"7-Zip — %@", _archiveURL.lastPathComponent];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app { return YES; }
