@@ -98,6 +98,10 @@ typedef NS_ENUM(NSInteger, SZOverwriteResponse) {
 /// 请求取消（线程安全；引擎在下一回调点返回 E_ABORT）。
 - (void)cancel;
 
+/// 暂停/继续（线程安全；引擎在下一回调点就地 sleep 轮询等待，不占 CPU、不结束任务）。
+- (void)setPaused:(BOOL)paused;
+@property (nonatomic, readonly, getter=isPaused) BOOL paused;
+
 /// 同步解压（在调用线程阻塞执行，无进度回调/无询问）。供 Finder 拖出的 file promise 在后台队列直接调用。
 /// 返回 ok（无错误完成）。务必在后台线程调用，勿在主线程。
 - (BOOL)extractArchiveSync:(NSString *)archivePath options:(SZArchiveExtractOptions *)options;

@@ -16,6 +16,7 @@
 #include "7zip/UI/Agent/Agent.h"            // g_CodecsObj / LoadGlobalCodecs
 
 #include "SZExtractCore.h"
+#include <time.h>   // nanosleep（暂停轮询）
 
 using namespace NWindows;
 
@@ -97,7 +98,15 @@ class SZExtractCallback Z7_final:
   UString _password;
   bool _passwordDefined;
 
-  bool Break() const { return _del && _del->isCancelled(); }
+  // 暂停时就地 sleep 轮询（100ms，对齐 kPauseSleepTime）直到 unpause；返回是否应中止（取消）。
+  bool Break() const {
+    if (!_del) return false;
+    while (_del->isPaused() && !_del->isCancelled()) {
+      struct timespec ts = {0, 100 * 1000 * 1000};
+      nanosleep(&ts, NULL);
+    }
+    return _del->isCancelled();
+  }
   HRESULT GetPasswordImpl(BSTR *password);
 
 public:

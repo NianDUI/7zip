@@ -68,6 +68,7 @@ public:
   __weak id<SZArchiveExtractDelegate> objc;
   __weak SZArchiveExtractor *owner;
   std::atomic<bool> *cancelled;
+  std::atomic<bool> *paused;
   uint64_t total = 0;
 
   void onTotalBytes(uint64_t t) override { total = t; }
@@ -152,6 +153,7 @@ public:
   }
 
   bool isCancelled() override { return cancelled && cancelled->load(); }
+  bool isPaused() override { return paused && paused->load(); }
 };
 
 #pragma mark - SZArchiveExtractOptions
@@ -171,17 +173,21 @@ public:
 @implementation SZArchiveExtractor {
   dispatch_queue_t _queue;
   std::atomic<bool> _cancelled;
+  std::atomic<bool> _paused;
 }
 
 - (instancetype)init {
   if ((self = [super init])) {
     _queue = dispatch_queue_create("com.7zip.SevenZipKit.extractor", DISPATCH_QUEUE_SERIAL);
     _cancelled.store(false);
+    _paused.store(false);
   }
   return self;
 }
 
 - (void)cancel { _cancelled.store(true); }
+- (void)setPaused:(BOOL)paused { _paused.store(paused); }
+- (BOOL)isPaused { return _paused.load(); }
 
 - (void)extractArchive:(NSString *)archivePath
                options:(SZArchiveExtractOptions *)options
@@ -199,13 +205,15 @@ public:
   SZExtractRequest req = MakeRequest(archivePaths, options);
 
   _cancelled.store(false);
+  _paused.store(false);
   __weak id<SZArchiveExtractDelegate> wdel = delegate;
-  // 强引用 self：保证解压期间 _cancelled / _queue 有效（任务结束 block 释放，无长期循环引用）。
+  // 强引用 self：保证解压期间 _cancelled / _paused / _queue 有效（任务结束 block 释放，无长期循环引用）。
   dispatch_async(_queue, ^{
     ObjCBridge bridge;
     bridge.objc = wdel;
     bridge.owner = self;
     bridge.cancelled = &self->_cancelled;
+    bridge.paused = &self->_paused;
 
     SZExtractResult r = SZExtractCore::run(req, &bridge);
 

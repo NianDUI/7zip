@@ -47,6 +47,8 @@ public:
   // 内存超限：返回 true=放行继续；false=跳过该档/中止。
   virtual bool askKeepGoingOnMemory(uint64_t requiredBytes, uint64_t allowedBytes) { return true; }
 
+  // 暂停标志：worker 在回调点轮询，paused 时就地 sleep 等待直到 unpause 或 cancel（对齐 kPauseSleepTime）。
+  virtual bool isPaused() { return false; }
   // 取消标志（对齐 CheckBreak2 → E_ABORT）。worker 线程高频轮询，须线程安全。
   virtual bool isCancelled() { return false; }
 };

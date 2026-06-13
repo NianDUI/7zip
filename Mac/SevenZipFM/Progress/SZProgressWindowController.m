@@ -14,6 +14,7 @@
   NSTextField *_fileLabel;      // 当前文件名
   NSTextField *_statsLabel;     // Elapsed / Processed / Speed / Files
   NSButton *_cancelButton;
+  NSButton *_pauseButton;
   NSTimer *_timer;
 
   // 由 delegate 回调更新（主队列），timer 拉取刷 UI（对齐 CProgressSync）
@@ -26,6 +27,9 @@
 
   BOOL _finished;
   BOOL _cancelled;
+  BOOL _paused;
+  NSDate *_pauseStart;
+  NSTimeInterval _pausedDuration;   // 累计暂停时长，从 elapsed 扣除（暂停期不计速度）
   BOOL _testMode;
   NSString *_verb;          // "解压" / "测试"
   NSString *_archiveName;
@@ -108,6 +112,7 @@ static NSMutableSet *g_alive;
 
   _cancelButton = [NSButton buttonWithTitle:@"取消" target:self action:@selector(onCancel:)];
   _cancelButton.keyEquivalent = @"\033"; // Esc
+  _pauseButton = [NSButton buttonWithTitle:@"暂停" target:self action:@selector(onPauseResume:)];
 
   NSStackView *col = [NSStackView stackViewWithViews:@[_titleLabel, _fileLabel, _bar, _statsLabel]];
   col.orientation = NSUserInterfaceLayoutOrientationVertical;
@@ -118,7 +123,9 @@ static NSMutableSet *g_alive;
   NSView *content = _window.contentView;
   [content addSubview:col];
   [content addSubview:_cancelButton];
+  [content addSubview:_pauseButton];
   _cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
+  _pauseButton.translatesAutoresizingMaskIntoConstraints = NO;
   [NSLayoutConstraint activateConstraints:@[
     [col.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:18],
     [col.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-18],
@@ -126,6 +133,8 @@ static NSMutableSet *g_alive;
     [_bar.widthAnchor constraintEqualToAnchor:col.widthAnchor],
     [_cancelButton.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-18],
     [_cancelButton.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-14],
+    [_pauseButton.trailingAnchor constraintEqualToAnchor:_cancelButton.leadingAnchor constant:-10],
+    [_pauseButton.centerYAnchor constraintEqualToAnchor:_cancelButton.centerYAnchor],
   ]];
 }
 
@@ -143,19 +152,42 @@ static NSString *FormatElapsed(NSTimeInterval s) {
   if (_totalBytes > 0)
     _bar.doubleValue = (double)_completedBytes / (double)_totalBytes;
 
-  const NSTimeInterval elapsed = -[_startDate timeIntervalSinceNow];
-  NSString *speed = @"–";
-  if (elapsed > 0.3 && _completedBytes > 0)
-    speed = [NSString stringWithFormat:@"%@/s", FormatBytes((uint64_t)(_completedBytes / elapsed))];
+  // elapsed 扣除累计暂停时长（含当前正暂停的时段），使速度/剩余时间不被暂停拉偏
+  NSTimeInterval elapsed = -[_startDate timeIntervalSinceNow] - _pausedDuration;
+  if (_paused && _pauseStart) elapsed -= -[_pauseStart timeIntervalSinceNow];
+  if (elapsed < 0) elapsed = 0;
 
-  _statsLabel.stringValue = [NSString stringWithFormat:@"已用 %@   已处理 %@   速度 %@   文件 %lu%@",
-      FormatElapsed(elapsed), FormatBytes(_completedBytes), speed, (unsigned long)_fileCount,
+  NSString *speed = @"–", *remain = @"–";
+  if (elapsed > 0.3 && _completedBytes > 0) {
+    speed = [NSString stringWithFormat:@"%@/s", FormatBytes((uint64_t)(_completedBytes / elapsed))];
+    if (_totalBytes > _completedBytes) {
+      NSTimeInterval rem = (double)(_totalBytes - _completedBytes) * elapsed / (double)_completedBytes;
+      remain = FormatElapsed(rem);
+    }
+  }
+
+  _statsLabel.stringValue = [NSString stringWithFormat:@"已用 %@ / 剩余 %@   %@ / %@   速度 %@   文件 %lu%@",
+      FormatElapsed(elapsed), remain, FormatBytes(_completedBytes), FormatBytes(_totalBytes), speed,
+      (unsigned long)_fileCount,
       _errorCount ? [NSString stringWithFormat:@"   错误 %lu", (unsigned long)_errorCount] : @""];
 
   if (_currentFile) _fileLabel.stringValue = _currentFile;
 
   const int pct = _totalBytes ? (int)(100.0 * _completedBytes / _totalBytes) : 0;
-  _window.title = [NSString stringWithFormat:@"%d%%  %@ %@", pct, _verb, _archiveName];
+  _window.title = [NSString stringWithFormat:@"%@%d%%  %@ %@",
+      _paused ? @"[暂停] " : @"", pct, _verb, _archiveName];
+}
+
+- (void)onPauseResume:(id)sender {
+  _paused = !_paused;
+  [_extractor setPaused:_paused];
+  _pauseButton.title = _paused ? @"继续" : @"暂停";
+  if (_paused) {
+    _pauseStart = [NSDate date];
+  } else if (_pauseStart) {
+    _pausedDuration += -[_pauseStart timeIntervalSinceNow];
+    _pauseStart = nil;
+  }
 }
 
 #pragma mark - 取消
