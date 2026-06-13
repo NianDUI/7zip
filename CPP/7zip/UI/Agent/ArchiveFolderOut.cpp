@@ -43,7 +43,12 @@ static bool Delete_EmptyFolder_And_EmptySubFolders(const FString &path)
           return false;
         if (!found)
           break;
+#ifdef _WIN32
         if (fileInfo.IsDir())
+#else
+        // POSIX：CDirEntry 无无参 IsDir()（symlink 的 d_type 需 stat 才确定），用枚举器解析
+        if (enumerator.DirEntry_IsDir(fileInfo, false /* followLink */))
+#endif
           names.Add(fileInfo.Name);
       }
     }
@@ -57,8 +62,11 @@ static bool Delete_EmptyFolder_And_EmptySubFolders(const FString &path)
       return false;
   }
   // we clear read-only attrib to remove read-only dir
+#ifdef _WIN32
   if (!SetFileAttrib(path, 0))
     return false;
+#endif
+  // POSIX：目录可删与否取决于父目录写权限，无需先清自身只读属性
   return RemoveDir(path);
 }
 

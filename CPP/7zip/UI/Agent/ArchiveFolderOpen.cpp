@@ -206,16 +206,21 @@ Z7_COM7F_IMF(CArchiveFolderManager::GetIconPath(const wchar_t *ext, BSTR *iconPa
   }
   #endif
 
+ #ifdef _WIN32
   int ii;
   if (InternalIcons.FindIconIndex(ext, ii))
   {
     FString path;
-    if (NWindows::NDLL::MyGetModuleFileName(path))
-    {
+    if (NWindows::NDLL::MyGetModuleFileName(path))   // POSIX 无此 API（用 argv[0] 定位），且
+    {                                                 // InternalIcons 在 POSIX 恒空（LoadIcons stub）
       *iconIndex = ii;
       return StringToBstr(fs2us(path), iconPath);
     }
   }
+ #else
+  // POSIX(macOS)：扩展名→图标走 UTType/Asset Catalog（M1-T4），不返回 PE 模块内嵌图标路径
+  (void)ext;
+ #endif
   return S_OK;
 }
 

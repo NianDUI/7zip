@@ -14,4 +14,10 @@
 // 个别上层代码用了 Windows 拼写 UINT64（UpdateCallbackAgent.cpp）。7-Zip 自有类型为 UInt64。
 typedef UInt64 UINT64;
 
+// 模块句柄类型。Agent.h:335 CCodecIcons::LoadIcons(HMODULE) 无条件引用，但 HMODULE 仅在
+// Windows/DLL.h 定义（POSIX 分支 typedef void*），而该头仅在 Z7_EXTERNAL_CODECS 路径被 include。
+// internal codecs 编译时 LoadCodecs.h 不引 DLL.h → HMODULE 缺失。此处补一份等价 typedef
+// （与 DLL.h:9 完全一致，C++ 允许重复 typedef，external 模式无影响）。
+typedef void *HMODULE;
+
 #endif // !_WIN32

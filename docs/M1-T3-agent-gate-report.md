@@ -14,6 +14,7 @@
    - **A 类·宏/类型**（INVALID_FILE_ATTRIBUTES、UINT64）→ 零侵入 shim 头解决，不改上游。
    - **B 类·Windows-only 成员裸访问**（CFileInfo.Attrib/IsDevice、CDirItem.IsAltStream、NTFS alt-stream、PE 图标资源）→ 上游已用 `#ifdef _WIN32` 正确排除这些成员，仅 Agent 代码未加保护（因从未在 POSIX 编过）。逐处加 `#ifdef` + POSIX 等价即可。
 3. **读/写路径可分离**（决定 M1 范围）：M1 只读浏览只需读路径，写路径留 M3。
+   > ⚠ **M1-T5 修正**：此结论仅在"单文件 `.o` 编译"层成立。链接成可执行时，`CAgent`/`CAgentFolder` 读写一体的 vtable 强制要求写路径符号存在（`new CAgent` 实例化），故 `AgentOut.cpp`/`ArchiveFolderOut.cpp` 的编译补丁已在 **M1-T5 前移落实**（非 M3），运行仍只走读路径。详见 `docs/M1-T5-agent-browse-report.md` 发现 1 与 `upstream-patches.md` P3/P4。
 
 | 文件 | 路径 | M1 状态 |
 |---|---|---|
@@ -22,8 +23,8 @@
 | ArchiveFolder.cpp | 读（导航） | ✅ shim 后通过 |
 | ArchiveFolderOpen.cpp | 读（OpenFolderFile 入口） | ✅ 图标 stub 后通过 |
 | UpdateCallbackAgent.cpp | 回调 | ✅ shim 后通过 |
-| AgentOut.cpp | 写（更新） | ⏸ M3（6 处修法已查明） |
-| ArchiveFolderOut.cpp | 写（删除/属性） | ⏸ M3 |
+| AgentOut.cpp | 写（更新） | ✅ M1-T5 已落实（4 处，vtable 完整性前移；见 P3） |
+| ArchiveFolderOut.cpp | 写（删除/属性） | ✅ M1-T5 已落实（2 处；见 P4） |
 
 ## 验收
 

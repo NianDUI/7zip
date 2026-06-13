@@ -225,9 +225,14 @@ Z7_COM7F_IMF(CAgent::DoOperation(
 
   {
     FString folderPrefix = _folderPrefix;
+#ifdef _WIN32
     if (!NFile::NName::IsAltStreamPrefixWithColon(fs2us(folderPrefix)))
       NFile::NName::NormalizeDirPathPrefix(folderPrefix);
-    
+#else
+    // POSIX(macOS)：无 NTFS 备用数据流，路径恒非 alt-stream 前缀，直接规范化目录前缀
+    NFile::NName::NormalizeDirPathPrefix(folderPrefix);
+#endif
+
     RINOK(dirItems.EnumerateItems2(folderPrefix, _updatePathPrefix, _names, requestedPaths))
 
     if (_updatePathPrefix_is_AltFolder)
@@ -237,7 +242,9 @@ Z7_COM7F_IMF(CAgent::DoOperation(
         CDirItem &item = dirItems.Items[i];
         if (item.IsDir())
           return E_NOTIMPL;
-        item.IsAltStream = true;
+#ifdef _WIN32
+        item.IsAltStream = true;   // POSIX: CFileInfoBase 无 IsAltStream 成员，且此分支 mac 不可达
+#endif
       }
     }
   }
@@ -507,7 +514,7 @@ HRESULT CAgent::CreateFolder(ISequentialOutStream *outArchiveStream,
 
   CDirItem di;
 
-  di.Attrib = FILE_ATTRIBUTE_DIRECTORY;
+  di.SetAsDir();   // 跨平台目录标志（Windows: Attrib=FILE_ATTRIBUTE_DIRECTORY；POSIX: mode=S_IFDIR）
   di.Size = 0;
   bool isAltStreamFolder = false;
   if (_proxy2)
@@ -518,7 +525,13 @@ HRESULT CAgent::CreateFolder(ISequentialOutStream *outArchiveStream,
 
   FILETIME ft;
   NTime::GetCurUtcFileTime(ft);
+#ifdef _WIN32
   di.CTime = di.ATime = di.MTime = ft;
+#else
+  // POSIX：CFiTime=timespec，无 FILETIME 赋值重载，经全局 FILETIME_To_timespec 转换
+  FILETIME_To_timespec(ft, di.CTime);
+  di.ATime = di.MTime = di.CTime;
+#endif
 
   dirItems.Items.Add(di);
 

@@ -9,9 +9,13 @@
 | # | 文件 | 处数 | 里程碑 | 性质 |
 |---|------|------|--------|------|
 | P1 | `CPP/7zip/UI/Agent/Agent.cpp` | 3 | M1-T3 | Windows-only 字段裸访问 → POSIX 等价 |
-| P2 | `CPP/7zip/UI/Agent/ArchiveFolderOpen.cpp` | 4 | M1-T3/T4 | 图标资源加载（纯 Win）→ POSIX 空 stub |
+| P2 | `CPP/7zip/UI/Agent/ArchiveFolderOpen.cpp` | 5 | M1-T3/T4/T5 | 图标资源加载（纯 Win）→ POSIX 空 stub |
+| P3 | `CPP/7zip/UI/Agent/AgentOut.cpp` | 4 | M1-T5 | 写路径 Windows-only 字段/类型 → POSIX 等价（vtable 完整性，见下） |
+| P4 | `CPP/7zip/UI/Agent/ArchiveFolderOut.cpp` | 2 | M1-T5 | 写路径 CDirEntry/SetFileAttrib → POSIX 等价 |
 
-> 另有零侵入预包含 shim `Mac/compat/win_compat_mac.h`（不改上游，`-include` 注入）：补 `INVALID_FILE_ATTRIBUTES` 宏、`UINT64` 类型别名。
+> 另有零侵入预包含 shim `Mac/compat/win_compat_mac.h`（不改上游，`-include` 注入）：补 `INVALID_FILE_ATTRIBUTES` 宏、`UINT64` 类型别名、`HMODULE` 类型别名（与 `Windows/DLL.h:9` 一致；internal codecs 编译时 LoadCodecs.h 不引 DLL.h 致 `Agent.h:335 CCodecIcons::LoadIcons(HMODULE)` 缺类型，补此即可，external 模式无影响）。
+
+> **为何写路径（P3/P4）在 M1（只读浏览）就需要落实**：`CAgent`/`CAgentFolder` 读写一体（单一类多继承读 `IFolderFolder` + 写 `IFolderOperations` 全部虚方法）。`OpenFolderFile` 内 `new CAgent` 实例化在**链接期**强制要求完整 vtable，即写路径方法符号（`AgentOut.cpp`/`ArchiveFolderOut.cpp` 定义）必须存在。故只读浏览无法"只链接读路径子集"——这是 M1-T3 报告"写路径留 M3"在单文件 `.o` 编译层未暴露、链接成可执行才显现的盲区。M1-T5 已据此把写路径 2 文件的编译补丁前移落实（运行仍只走读路径）。
 
 ---
 
@@ -37,20 +41,30 @@
 | L13 `extern HINSTANCE g_hInstance` + `kIconTypesResId` | `#ifdef _WIN32` 包裹 |
 | `LoadIcons` 函数体 | `#ifdef _WIN32` 原逻辑 `#else (void)m;`（IconPairs 留空） |
 | L78 `InternalIcons.LoadIcons(g_hInstance)` | `#else InternalIcons.LoadIcons(NULL);` |
+| `GetIconPath` 内 `InternalIcons.FindIconIndex`+`MyGetModuleFileName(path)` 块（M1-T5 补） | `#ifdef _WIN32` 包裹 PE 模块图标路径块，`#else (void)ext;`。POSIX 无 `MyGetModuleFileName`（DLL.cpp 该函数 `_WIN32` only，POSIX 用 argv[0] 定位），且 `InternalIcons` 在 POSIX 恒空，本块死代码 |
 
 重放要点：M1-T4 完成 UTType 图标后，此 stub 的 `#else` 分支由真实实现替换（届时更新本条）。
 
 ---
 
-## 待登记（M3 写路径，已查明修法，尚未改）
+## P3 · AgentOut.cpp（4 处，M1-T5 已落实）
 
-`AgentOut.cpp`、`ArchiveFolderOut.cpp` 是归档更新（写）路径，M1 只读不编译它们。M3 实施时按下表改并登记：
+写路径（归档更新/新建文件夹）对 `CDirItem`(继承 `CFileInfoBase`) 的 Windows-only 成员/类型裸访问。M1-T5 因 vtable 完整性（见上）已落实：
 
-| 文件:行 | 错误 | 修法 |
+| 位置（26.01 行号） | 原 | POSIX 分支 |
 |---|---|---|
-| AgentOut.cpp:228 | `IsAltStreamPrefixWithColon` | `#ifdef _WIN32` 包条件，POSIX 恒 normalize |
-| AgentOut.cpp:240 | `item.IsAltStream = true` | `#ifdef _WIN32` 包裹 |
-| AgentOut.cpp:510 | `di.Attrib = FILE_ATTRIBUTE_DIRECTORY` | `di.SetAsDir();`（FileFind.h:135 跨平台） |
-| AgentOut.cpp:521 | `di.CTime=di.ATime=di.MTime=ft`（FILETIME→CFiTime 无重载） | `#ifdef _WIN32` 直赋；POSIX 用 FILETIME→CFiTime 转换 |
-| ArchiveFolderOut.cpp:46 | `CDirEntry::IsDir()` 不存在 | `enumerator.DirEntry_IsDir(fileInfo, false)`（FileFind.h:311） |
-| ArchiveFolderOut.cpp:60 | `SetFileAttrib` 未声明 | `#ifdef _WIN32` 包裹（POSIX 删 readonly 目录无需先清属性） |
+| ~L228 | `if (!NName::IsAltStreamPrefixWithColon(...)) NormalizeDirPathPrefix(...)` | `#ifdef _WIN32` 原逻辑；`#else` 直接 `NormalizeDirPathPrefix`（mac 无 NTFS alt-stream） |
+| ~L240 | `item.IsAltStream = true` | `#ifdef _WIN32` 包裹（POSIX `CFileInfoBase` 无 `IsAltStream` 成员，且此分支 mac 不可达） |
+| ~L510 | `di.Attrib = FILE_ATTRIBUTE_DIRECTORY` | `di.SetAsDir();`（FileFind.h:107/135 跨平台访问器，Windows 等价 `Attrib=FILE_ATTRIBUTE_DIRECTORY`） |
+| ~L521 | `di.CTime = di.ATime = di.MTime = ft`（ft 为 FILETIME；POSIX `CFiTime=timespec` 无 FILETIME 赋值重载） | `#ifdef _WIN32` 直赋；`#else` 全局 `FILETIME_To_timespec(ft, di.CTime); di.ATime = di.MTime = di.CTime;` |
+
+重放要点：`FILETIME_To_timespec` 是**全局函数**（非 `NWindows::NTime` 成员，TimeUtils.h POSIX 分支在 namespace 块之前）。
+
+## P4 · ArchiveFolderOut.cpp（2 处，M1-T5 已落实）
+
+写路径（删除空文件夹及子树）：
+
+| 位置（26.01 行号） | 原 | POSIX 分支 |
+|---|---|---|
+| ~L46 | `if (fileInfo.IsDir())`（`CDirEntry` POSIX 无无参 `IsDir()`，symlink 的 d_type 需 stat 才定） | `#ifdef _WIN32` 原逻辑；`#else if (enumerator.DirEntry_IsDir(fileInfo, false))`（FileFind.h:311） |
+| ~L60 | `if (!SetFileAttrib(path, 0)) return false;`（POSIX 无 `SetFileAttrib`） | `#ifdef _WIN32` 包裹（POSIX 删只读目录权限取决于父目录，无需先清自身属性） |
