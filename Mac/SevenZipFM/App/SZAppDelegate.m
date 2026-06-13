@@ -1,6 +1,7 @@
 // SZAppDelegate.m —— 主窗口：地址栏 + NSTableView(view-based 3 列) + 状态栏；双击/Backspace/Enter 导航。
 #import "SZAppDelegate.h"
 #import "SZPanelController.h"
+#import "SZProgressWindowController.h"
 #import "SevenZipKit/SZPanelModel.h"
 
 #pragma mark - 键盘可达的 NSTableView
@@ -129,5 +130,29 @@
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app { return YES; }
+
+#pragma mark - 解压（M2 接线）
+
+// 菜单"解压到…"（Cmd+E）：选目标目录 → 进度窗解压整档（M2-T3 完整对话框后续替换此最简入口）。
+- (void)extractTo:(id)sender {
+  if (!_archiveURL) { NSBeep(); return; }
+  NSOpenPanel *p = [NSOpenPanel openPanel];
+  p.canChooseDirectories = YES;
+  p.canChooseFiles = NO;
+  p.allowsMultipleSelection = NO;
+  p.prompt = @"解压到此";
+  p.message = @"选择解压目标目录";
+  p.directoryURL = _archiveURL.URLByDeletingLastPathComponent;
+  if ([p runModal] != NSModalResponseOK || !p.URL) return;
+
+  SZProgressWindowController *pc = [SZProgressWindowController new];
+  [pc beginExtractArchive:_archiveURL.path toDirectory:p.URL.path password:nil completion:nil];
+}
+
+// 仅在已打开归档时启用菜单项
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+  if (item.action == @selector(extractTo:)) return _archiveURL != nil;
+  return YES;
+}
 
 @end

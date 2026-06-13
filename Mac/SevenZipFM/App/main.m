@@ -10,7 +10,7 @@ int main(int argc, const char **argv) {
     SZAppDelegate *delegate = [SZAppDelegate new];
     app.delegate = delegate;
 
-    // 最小菜单：应用菜单 + Quit（Cmd+Q）
+    // 菜单：应用菜单（关于/退出）+ 文件菜单（解压）
     NSMenu *mainMenu = [NSMenu new];
     NSMenuItem *appItem = [NSMenuItem new];
     [mainMenu addItem:appItem];
@@ -19,6 +19,13 @@ int main(int argc, const char **argv) {
     [appMenu addItem:[NSMenuItem separatorItem]];
     [appMenu addItemWithTitle:@"退出 7-Zip" action:@selector(terminate:) keyEquivalent:@"q"];
     appItem.submenu = appMenu;
+
+    NSMenuItem *fileItem = [NSMenuItem new];
+    [mainMenu addItem:fileItem];
+    NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"文件"];
+    [fileMenu addItemWithTitle:@"解压到…" action:@selector(extractTo:) keyEquivalent:@"e"];
+    fileItem.submenu = fileMenu;
+
     app.mainMenu = mainMenu;
 
     [app run];
