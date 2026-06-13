@@ -125,9 +125,11 @@ static NSMutableSet *g_alive;
     [col.trailingAnchor constraintEqualToAnchor:_window.contentView.trailingAnchor],
     [col.topAnchor constraintEqualToAnchor:_window.contentView.topAnchor],
     [col.bottomAnchor constraintEqualToAnchor:_window.contentView.bottomAnchor],
-    // 让 grid/按钮行撑满对话框内宽（col.width 减去左右各 18 的 edgeInsets），
-    // grid 第 1 列(控件列)为 Fill，于是目标框/下拉随之变宽，路径不再被压窄。
-    [grid.widthAnchor constraintEqualToAnchor:col.widthAnchor constant:-36],
+    // NSGridView 不会把多余宽度分给控件列，故直接给控件设最小宽度，grid 自然左对齐成表单。
+    [_destCombo.widthAnchor constraintGreaterThanOrEqualToConstant:300],
+    [_pathModePopup.widthAnchor constraintGreaterThanOrEqualToConstant:200],
+    [_overwritePopup.widthAnchor constraintGreaterThanOrEqualToConstant:200],
+    [_passwordField.widthAnchor constraintGreaterThanOrEqualToConstant:200],
     [btnRow.widthAnchor constraintEqualToAnchor:col.widthAnchor constant:-36],
   ]];
 }
