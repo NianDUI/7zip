@@ -73,11 +73,27 @@ chmod +x "$APP/Contents/MacOS/SevenZipFM"
 codesign --force --sign - "$APP" 2>/dev/null || echo "  (ad-hoc 签名跳过)"
 echo "  ✓ $APP"
 
+echo "==[5] 生成样本归档（/tmp 清理后随构建重建，供桌面验证）=="
+SAMPLE="$OUT/sample.7z"
+if [ ! -f "$SAMPLE" ] || [ ! -f "$OUT/sample-enc.7z" ]; then
+  clang++ -arch arm64 "$ALONE"/*.o -framework CoreFoundation -lz -o "$OUT/7zz" 2>/dev/null
+  S="$OUT/sample_src"; rm -rf "$S"; mkdir -p "$S/子目录/深层"
+  echo "顶层文件内容" > "$S/readme.txt"
+  printf '中文内容测试\n' > "$S/中文.txt"
+  echo "inner file" > "$S/子目录/inner.txt"
+  head -c 120000 /dev/urandom > "$S/子目录/深层/data.bin"
+  ( cd "$OUT" && rm -f sample.7z sample-enc.7z sample.zip
+    ./7zz a sample.7z sample_src >/dev/null
+    ./7zz a -ppass123 sample-enc.7z sample_src >/dev/null
+    ./7zz a sample.zip sample_src >/dev/null )
+fi
+echo "  ✓ $OUT/sample.7z / sample-enc.7z（密码 pass123）/ sample.zip"
+
 echo ""
 echo "===== 构建完成（M1 浏览 + M2 解压接入）====="
 echo "结构验证："
 file "$APP/Contents/MacOS/SevenZipFM" | sed 's/^/  /'
 /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Contents/Info.plist" | sed 's/^/  BundleID: /'
 echo ""
-echo "桌面运行（需图形会话）：open \"$APP\" --args /tmp/szsort_t6/test.7z"
-echo "或：\"$APP/Contents/MacOS/SevenZipFM\" /tmp/szsort_t6/test.7z"
+echo "桌面运行（需图形会话）：open \"$APP\" --args \"$OUT/sample.7z\""
+echo "加密档（密码 pass123）：open \"$APP\" --args \"$OUT/sample-enc.7z\""
