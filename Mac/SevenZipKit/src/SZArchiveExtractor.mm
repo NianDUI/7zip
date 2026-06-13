@@ -46,6 +46,20 @@ static SZOverwriteAnswer MapResponse(SZOverwriteResponse r) {
   }
 }
 
+// ObjC 选项 → C++ request（在调用线程拷贝，避免后台访问 ObjC 集合）
+static SZExtractRequest MakeRequest(NSArray<NSString *> *archivePaths, SZArchiveExtractOptions *options) {
+  SZExtractRequest req;
+  for (NSString *p in archivePaths) req.archivePaths.push_back(SZU(p));
+  req.outputDir     = SZU(options.outputDirectory);
+  req.pathMode      = MapPathMode(options.pathMode);
+  req.overwriteMode = MapOverwriteMode(options.overwriteMode);
+  req.testMode      = options.testMode;
+  req.elimDup       = options.eliminateDuplicatePaths;
+  if (options.password) { req.hasPassword = true; req.password = SZU(options.password); }
+  for (NSString *s in options.selectedPaths) req.selectedPaths.push_back(SZU(s));
+  return req;
+}
+
 #pragma mark - C++ → ObjC 桥接 delegate
 
 // 引擎在后台线程调用本类；进度异步 hop 主队列，阻塞询问经信号量同步等主队列。
@@ -182,15 +196,7 @@ public:
                delegate:(id<SZArchiveExtractDelegate>)delegate
              completion:(void (^)(BOOL, uint64_t, uint64_t, uint64_t, NSString *))completion {
   // 在调用线程把所有 ObjC 参数拷成 C++ request，避免后台线程访问 ObjC 集合。
-  SZExtractRequest req;
-  for (NSString *p in archivePaths) req.archivePaths.push_back(SZU(p));
-  req.outputDir     = SZU(options.outputDirectory);
-  req.pathMode      = MapPathMode(options.pathMode);
-  req.overwriteMode = MapOverwriteMode(options.overwriteMode);
-  req.testMode      = options.testMode;
-  req.elimDup       = options.eliminateDuplicatePaths;
-  if (options.password) { req.hasPassword = true; req.password = SZU(options.password); }
-  for (NSString *s in options.selectedPaths) req.selectedPaths.push_back(SZU(s));
+  SZExtractRequest req = MakeRequest(archivePaths, options);
 
   _cancelled.store(false);
   __weak id<SZArchiveExtractDelegate> wdel = delegate;
@@ -209,6 +215,12 @@ public:
     if (completion)
       dispatch_async(dispatch_get_main_queue(), ^{ completion(ok, nf, nfe, noe, em); });
   });
+}
+
+- (BOOL)extractArchiveSync:(NSString *)archivePath options:(SZArchiveExtractOptions *)options {
+  SZExtractRequest req = MakeRequest(archivePath ? @[archivePath] : @[], options);
+  SZExtractResult r = SZExtractCore::run(req, nullptr);
+  return (r.hresult == 0 && r.numFileErrors == 0 && r.numOpenErrors == 0);
 }
 
 @end

@@ -129,6 +129,7 @@
   __weak typeof(self) weakSelf = self;
   _table.onNavigate = ^{ [weakSelf refreshChrome]; };
   _panel.onReload = ^{ [weakSelf refreshChrome]; };
+  _panel.archivePath = url.path;          // Finder 拖出延迟解压源（M2-T6）
   [_panel bindTableView:_table];
   [self refreshChrome];
   [_window makeFirstResponder:_table];   // 让 Backspace/Enter 键盘导航生效（修返回上级）

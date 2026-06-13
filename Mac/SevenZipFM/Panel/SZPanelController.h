@@ -10,10 +10,13 @@ extern NSString *const SZColID_Name;
 extern NSString *const SZColID_Size;
 extern NSString *const SZColID_Modified;
 
-@interface SZPanelController : NSObject <NSTableViewDataSource, NSTableViewDelegate>
+@interface SZPanelController : NSObject <NSTableViewDataSource, NSTableViewDelegate, NSFilePromiseProviderDelegate>
 
 - (instancetype)initWithModel:(SZPanelModel *)model;
 @property (nonatomic, readonly) SZPanelModel *model;
+
+/// 当前归档 FS 路径——Finder 拖出（file promise 延迟解压）的解压源；nil 则禁用拖出。
+@property (nonatomic, copy, nullable) NSString *archivePath;
 
 /// 绑定一个 NSTableView（设 dataSource/delegate、建列、装双击/排序回调）。可为 nil 走纯逻辑（headless）。
 - (void)bindTableView:(nullable NSTableView *)tableView;

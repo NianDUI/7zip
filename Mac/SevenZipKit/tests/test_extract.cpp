@@ -50,6 +50,7 @@ int main(int argc, char **argv) {
     std::string a = argv[i];
     if (a == "-t") req.testMode = true;
     else if (a == "-m" && i + 1 < argc) req.archivePaths.push_back(argv[++i]); // 追加归档（多档案批量）
+    else if (a == "-s" && i + 1 < argc) req.selectedPaths.push_back(argv[++i]); // 选定档内路径（验证拖出递归）
     else if (a == "-p" && i + 1 < argc) {
       req.hasPassword = true; req.password = argv[++i];
       del.hasPw = true; del.preset = req.password;
