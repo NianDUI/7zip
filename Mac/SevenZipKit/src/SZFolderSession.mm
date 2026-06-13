@@ -63,6 +63,13 @@ static SZSortKey SZKeyFromColumn(SZSortColumn c) {
   return self;
 }
 
++ (NSArray<NSString *> *)supportedArchiveExtensions {
+  const std::vector<std::string> v = SZFolderCore::ArchiveExtensions();
+  NSMutableArray *a = [NSMutableArray arrayWithCapacity:v.size()];
+  for (const std::string &s : v) [a addObject:SZStr(s)];
+  return a;
+}
+
 + (instancetype)sessionWithFileURL:(NSURL *)url error:(NSError **)error {
   SZFolderSession *s = [SZFolderSession new];
   const int rc = s->_core.open(url.fileSystemRepresentation);

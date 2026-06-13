@@ -170,6 +170,20 @@ struct SZFolderCore::Impl {
 SZFolderCore::SZFolderCore() : _p(new Impl) {}
 SZFolderCore::~SZFolderCore() { delete _p; }
 
+std::vector<std::string> SZFolderCore::ArchiveExtensions() {
+  // 来源 = 格式 handler 表 g_CodecsObj->Formats[*].Exts（非 Windows PE 图标资源表）。
+  // CArchiveFolderManager::GetExtensions 走 CCodecIcons 图标表，POSIX 下被 stub 留空（M1-T4），故直接查格式表。
+  std::vector<std::string> out;
+  if (LoadGlobalCodecs() != S_OK || !g_CodecsObj) return out;
+  FOR_VECTOR (i, g_CodecsObj->Formats) {
+    const CArcInfoEx &ai = g_CodecsObj->Formats[i];
+    FOR_VECTOR (j, ai.Exts)
+      if (!ai.Exts[j].Ext.IsEmpty())
+        out.push_back(ToUtf8(ai.Exts[j].Ext.Ptr()));
+  }
+  return out;
+}
+
 int SZFolderCore::open(const char *fsPath) {
   CInFileStream *fileSpec = new CInFileStream;
   _p->stream = fileSpec;

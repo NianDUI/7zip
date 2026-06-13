@@ -29,6 +29,10 @@ public:
   SZFolderCore(const SZFolderCore &) = delete;
   SZFolderCore &operator=(const SZFolderCore &) = delete;
 
+  /// 引擎支持的全部归档扩展名（小写，无点，如 "7z"/"zip"/"rar"）。替代 Windows PE 资源 ext 表（M1-T4）；
+  /// 来源 CArchiveFolderManager::GetExtensions（internal codecs 静态格式表）。图标走 UTType（见 SZPanelController）。
+  static std::vector<std::string> ArchiveExtensions();
+
   /// 打开归档并绑定根。返回 0 成功；1=无法打开文件；2=非归档(S_FALSE)；否则原始 HRESULT(<0)。
   int open(const char *fsPath);
 

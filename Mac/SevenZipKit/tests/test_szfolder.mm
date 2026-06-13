@@ -46,6 +46,16 @@ int main(int argc, const char **argv) {
       break;
     }
 
+    // M1-T4：格式扩展名表（替代 PE 资源 ext 表）
+    NSArray<NSString *> *exts = [SZFolderSession supportedArchiveExtensions];
+    BOOL has7z = [exts containsObject:@"7z"], hasZip = [exts containsObject:@"zip"],
+         hasTar = [exts containsObject:@"tar"], hasGz = [exts containsObject:@"gz"];
+    printf("\n[M1-T4] 支持归档扩展名 %lu 种（7z=%d zip=%d tar=%d gz=%d）\n",
+           (unsigned long)exts.count, has7z, hasZip, hasTar, hasGz);
+    if (!(exts.count > 20 && has7z && hasZip && hasTar && hasGz)) {
+      printf("FAIL: 格式扩展名表异常\n"); return 1;
+    }
+
     printf("\n===== SZFolderSession 只读浏览端到端通过 =====\n");
   }
   return 0;

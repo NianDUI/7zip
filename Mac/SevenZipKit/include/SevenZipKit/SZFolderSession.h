@@ -22,6 +22,10 @@ typedef NS_ENUM(NSInteger, SZSortColumn) {
 /// 注意：底层 arcFormat 传空串=自动嗅探（不可 NULL，见 M1-T5 报告发现 3）。
 + (nullable instancetype)sessionWithFileURL:(NSURL *)url error:(NSError * _Nullable * _Nullable)error;
 
+/// 引擎支持的全部归档扩展名（小写无点，如 @"7z"/@"zip"）。替代 Windows PE 资源 ext 表（M1-T4），
+/// 供 FM 判定"是否归档"、文件关联（M5-T3）。文件图标走 UTType（NSWorkspace iconForContentType）。
++ (NSArray<NSString *> *)supportedArchiveExtensions;
+
 /// 当前文件夹的档内前缀路径（根为空串）。
 @property (nonatomic, readonly, copy) NSString *currentPath;
 
