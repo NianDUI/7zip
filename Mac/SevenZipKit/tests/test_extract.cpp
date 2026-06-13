@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
   for (int i = 3; i < argc; i++) {
     std::string a = argv[i];
     if (a == "-t") req.testMode = true;
+    else if (a == "-m" && i + 1 < argc) req.archivePaths.push_back(argv[++i]); // 追加归档（多档案批量）
     else if (a == "-p" && i + 1 < argc) {
       req.hasPassword = true; req.password = argv[++i];
       del.hasPw = true; del.preset = req.password;
@@ -61,5 +62,7 @@ int main(int argc, char **argv) {
          r.hresult, U(r.numArchives), U(r.numFiles), U(r.numFolders), U(r.unpackSize),
          U(r.numFileErrors), U(r.numOpenErrors));
   if (!r.errorMessage.empty()) printf("errorMessage: %s\n", r.errorMessage.c_str());
+  // 对齐 7zz t 的总结文案（测试模式无错时）
+  if (req.testMode && r.isOK()) printf("There are no errors\n");
   return r.isOK() ? 0 : 1;
 }

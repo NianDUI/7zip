@@ -95,4 +95,16 @@ head -c 200 "$OUT/test.7z" > "$OUT/broken.7z"
 "$OUT/test_extract" "$OUT/broken.7z" "$OUT/outE" || echo "  （非零退出=预期，损坏档应报错）"
 
 echo ""
-echo "===== M2-T1 全部用例通过 ====="
+echo "===== F) 多档案批量编排（test.7z + test.zip 一次解压，统计聚合）====="
+rm -rf "$OUT/outF"
+"$OUT/test_extract" "$OUT/test.7z" "$OUT/outF" -m "$OUT/test.zip"
+echo "  期望：档案=2 文件=8（4×2）"
+
+echo ""
+echo "===== G) 多档案含一个损坏：好档照解、坏档计入打开错误 ====="
+rm -rf "$OUT/outG"
+"$OUT/test_extract" "$OUT/test.7z" "$OUT/outG" -m "$OUT/broken.7z" || echo "  （非零退出=预期：批量中有损坏档）"
+if diff -r "$OUT/outG/src" "$OUT/refA/src" >/dev/null; then echo "  ✓ 好档仍字节一致（坏档不影响好档）"; else echo "  ✗ 好档受损"; exit 1; fi
+
+echo ""
+echo "===== M2-T1 + M2-T5 全部用例通过 ====="
