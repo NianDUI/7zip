@@ -35,50 +35,37 @@
 static NSMutableSet *g_alive;
 
 - (void)beginExtractArchive:(NSString *)archivePath
-                toDirectory:(NSString *)destDir
-                   password:(NSString *)password
+                    options:(SZArchiveExtractOptions *)options
                  completion:(void (^)(BOOL))completion {
-  [self beginArchive:archivePath toDirectory:destDir testMode:NO password:password completion:completion];
-}
-
-- (void)beginTestArchive:(NSString *)archivePath
-                password:(NSString *)password
-              completion:(void (^)(BOOL))completion {
-  [self beginArchive:archivePath toDirectory:nil testMode:YES password:password completion:completion];
-}
-
-- (void)beginArchive:(NSString *)archivePath
-         toDirectory:(NSString *)destDir
-            testMode:(BOOL)testMode
-            password:(NSString *)password
-          completion:(void (^)(BOOL))completion {
   if (!g_alive) g_alive = [NSMutableSet new];
   [g_alive addObject:self];
   _completion = [completion copy];
   _archiveName = archivePath.lastPathComponent;
-  _testMode = testMode;
-  _verb = testMode ? @"测试" : @"解压";
+  _testMode = options.testMode;
+  _verb = options.testMode ? @"测试" : @"解压";
   _startDate = [NSDate date];
 
   [self buildWindow];
   [_window makeKeyAndOrderFront:nil];
 
-  SZArchiveExtractOptions *opts = [SZArchiveExtractOptions new];
-  opts.testMode = testMode;
-  if (!testMode) opts.outputDirectory = destDir;
-  opts.pathMode = SZExtractPathModeFull;
-  opts.overwriteMode = SZExtractOverwriteModeAsk;   // 触发 delegate askOverwrite
-  if (password.length) opts.password = password;
-
   _extractor = [SZArchiveExtractor new];
   __weak typeof(self) wself = self;
-  [_extractor extractArchive:archivePath options:opts delegate:self
+  [_extractor extractArchive:archivePath options:options delegate:self
                   completion:^(BOOL ok, uint64_t nf, uint64_t nfe, uint64_t noe, NSString *em) {
     [wself finishWithOK:ok errorMessage:em];
   }];
 
   _timer = [NSTimer scheduledTimerWithTimeInterval:0.2 target:self
                                           selector:@selector(refreshUI) userInfo:nil repeats:YES];
+}
+
+- (void)beginTestArchive:(NSString *)archivePath
+                password:(NSString *)password
+              completion:(void (^)(BOOL))completion {
+  SZArchiveExtractOptions *opts = [SZArchiveExtractOptions new];
+  opts.testMode = YES;
+  if (password.length) opts.password = password;
+  [self beginExtractArchive:archivePath options:opts completion:completion];
 }
 
 #pragma mark - UI 构建

@@ -16,7 +16,7 @@ cd "$CPP"
 [ -d "$ALONE" ] || { echo "缺 Alone2 对象集：cd CPP/7zip/Bundles/Alone2 && make -f ../../cmpl_mac_arm64.mak -j8"; exit 1; }
 
 CXXFLAGS=(-arch arm64 -O2 -DNDEBUG -D_REENTRANT -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -fPIC -std=c++11 -I . -include "$SHIM")
-OBJC=(-arch arm64 -O2 -fobjc-arc -I "$KIT/include" -I "$KIT/src" -I "$FM/Panel" -I "$FM/App" -I "$FM/Progress")
+OBJC=(-arch arm64 -O2 -fobjc-arc -I "$KIT/include" -I "$KIT/src" -I "$FM/Panel" -I "$FM/App" -I "$FM/Progress" -I "$FM/Dialogs")
 
 echo "==[1] Agent 闭环 + SevenZipKit C++ 核心 =="
 for f in Agent AgentProxy ArchiveFolder ArchiveFolderOpen UpdateCallbackAgent AgentOut ArchiveFolderOut; do
@@ -36,6 +36,7 @@ clang "${OBJC[@]}" -x objective-c++ -c "$KIT/src/SZPanelModel.mm"      -o "$OUT/
 clang "${OBJC[@]}" -std=c++11 -x objective-c++ -c "$KIT/src/SZArchiveExtractor.mm" -o "$OUT/SZArchiveExtractor.o"
 clang "${OBJC[@]}" -c "$FM/Panel/SZPanelController.m"            -o "$OUT/SZPanelController.o"
 clang "${OBJC[@]}" -c "$FM/Progress/SZProgressWindowController.m" -o "$OUT/SZProgressWindowController.o"
+clang "${OBJC[@]}" -c "$FM/Dialogs/SZExtractDialogController.m"   -o "$OUT/SZExtractDialogController.o"
 clang "${OBJC[@]}" -c "$FM/App/SZAppDelegate.m"                  -o "$OUT/SZAppDelegate.o"
 clang "${OBJC[@]}" -c "$FM/App/main.m"                           -o "$OUT/main.o"
 echo "  ✓"
@@ -51,6 +52,7 @@ for o in "$ALONE"/*.o; do
 done
 clang++ -arch arm64 \
   "$OUT/main.o" "$OUT/SZAppDelegate.o" "$OUT/SZPanelController.o" "$OUT/SZProgressWindowController.o" \
+  "$OUT/SZExtractDialogController.o" \
   "$OUT/SZPanelModel.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/SZArchiveExtractor.o" "$OUT/SZExtractCore.o" \
   "$OUT/Agent.o" "$OUT/AgentProxy.o" "$OUT/ArchiveFolder.o" "$OUT/ArchiveFolderOpen.o" \

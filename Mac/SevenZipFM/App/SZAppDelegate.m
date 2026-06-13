@@ -2,7 +2,9 @@
 #import "SZAppDelegate.h"
 #import "SZPanelController.h"
 #import "SZProgressWindowController.h"
+#import "SZExtractDialogController.h"
 #import "SevenZipKit/SZPanelModel.h"
+#import "SevenZipKit/SZArchiveExtractor.h"
 
 #pragma mark - 键盘可达的 NSTableView
 
@@ -142,20 +144,18 @@
 
 #pragma mark - 解压（M2 接线）
 
-// 菜单"解压到…"（Cmd+E）：选目标目录 → 进度窗解压整档（M2-T3 完整对话框后续替换此最简入口）。
+// 菜单/工具栏"解压"（Cmd+E）：弹解压对话框（目标/路径模式/覆盖模式/密码）→ 进度窗解压。
 - (void)extractTo:(id)sender {
   if (!_archiveURL) { NSBeep(); return; }
-  NSOpenPanel *p = [NSOpenPanel openPanel];
-  p.canChooseDirectories = YES;
-  p.canChooseFiles = NO;
-  p.allowsMultipleSelection = NO;
-  p.prompt = @"解压到此";
-  p.message = @"选择解压目标目录";
-  p.directoryURL = _archiveURL.URLByDeletingLastPathComponent;
-  if ([p runModal] != NSModalResponseOK || !p.URL) return;
-
-  SZProgressWindowController *pc = [SZProgressWindowController new];
-  [pc beginExtractArchive:_archiveURL.path toDirectory:p.URL.path password:nil completion:nil];
+  NSString *defDest = _archiveURL.URLByDeletingLastPathComponent.path;
+  [SZExtractDialogController presentForArchive:_archiveURL.lastPathComponent
+                            defaultDestination:defDest
+                                  parentWindow:_window
+                                    completion:^(SZArchiveExtractOptions *options) {
+    if (!options) return;
+    SZProgressWindowController *pc = [SZProgressWindowController new];
+    [pc beginExtractArchive:self->_archiveURL.path options:options completion:nil];
+  }];
 }
 
 // 测试归档完整性（testMode，不落盘）
