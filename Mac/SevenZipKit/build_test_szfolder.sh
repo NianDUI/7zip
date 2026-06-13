@@ -25,7 +25,7 @@ for f in Agent AgentProxy ArchiveFolder ArchiveFolderOpen UpdateCallbackAgent Ag
 done
 clang++ "${CXXFLAGS[@]}" -c Windows/DLL.cpp            -o "$OUT/DLL.o"
 clang++ "${CXXFLAGS[@]}" -c 7zip/UI/Common/WorkDir.cpp -o "$OUT/WorkDir.o"
-clang++ "${CXXFLAGS[@]}" -c "$REPO/Mac/poc/m1t5_link_stubs.cpp" -o "$OUT/m1t5_link_stubs.o"
+clang++ "${CXXFLAGS[@]}" -c "$REPO/Mac/SevenZipKit/platform/ZipRegistry_mac.cpp" -o "$OUT/ZipRegistry_mac.o"
 echo "  ✓ Agent 闭环对象就绪"
 
 echo "==[2] 编译 SevenZipKit 桥接核心 SZFolderCore.cpp（纯 C++，唯一 INITGUID 单元）=="
@@ -50,7 +50,7 @@ clang++ -arch arm64 \
   "$OUT/test_szfolder.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" \
   "$OUT/Agent.o" "$OUT/AgentProxy.o" "$OUT/ArchiveFolder.o" "$OUT/ArchiveFolderOpen.o" \
   "$OUT/UpdateCallbackAgent.o" "$OUT/AgentOut.o" "$OUT/ArchiveFolderOut.o" \
-  "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/m1t5_link_stubs.o" \
+  "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/ZipRegistry_mac.o" \
   "${ALONE_OBJS[@]}" \
   -framework Foundation -framework CoreFoundation -lz \
   -o "$OUT/test_szfolder"

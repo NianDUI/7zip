@@ -18,7 +18,7 @@ for f in Agent AgentProxy ArchiveFolder ArchiveFolderOpen UpdateCallbackAgent Ag
 done
 clang++ "${CXXFLAGS[@]}" -c Windows/DLL.cpp -o "$OUT/DLL.o"
 clang++ "${CXXFLAGS[@]}" -c 7zip/UI/Common/WorkDir.cpp -o "$OUT/WorkDir.o"
-clang++ "${CXXFLAGS[@]}" -c "$REPO/Mac/poc/m1t5_link_stubs.cpp" -o "$OUT/m1t5_link_stubs.o"
+clang++ "${CXXFLAGS[@]}" -c "$REPO/Mac/SevenZipKit/platform/ZipRegistry_mac.cpp" -o "$OUT/ZipRegistry_mac.o"
 clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/src/SZNaturalCompare.cpp" -o "$OUT/SZNaturalCompare.o"
 clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/src/SZFolderCore.cpp"     -o "$OUT/SZFolderCore.o"
 clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/tests/perf_test.cpp"      -o "$OUT/perf_test.o"
@@ -37,7 +37,7 @@ clang++ -arch arm64 \
   "$OUT/perf_test.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/Agent.o" "$OUT/AgentProxy.o" "$OUT/ArchiveFolder.o" "$OUT/ArchiveFolderOpen.o" \
   "$OUT/UpdateCallbackAgent.o" "$OUT/AgentOut.o" "$OUT/ArchiveFolderOut.o" \
-  "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/m1t5_link_stubs.o" \
+  "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/ZipRegistry_mac.o" \
   "${ALONE_OBJS[@]}" \
   -framework CoreFoundation -lz \
   -o "$OUT/perf_test"

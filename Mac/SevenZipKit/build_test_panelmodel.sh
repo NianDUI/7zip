@@ -20,7 +20,7 @@ for f in Agent AgentProxy ArchiveFolder ArchiveFolderOpen UpdateCallbackAgent Ag
 done
 clang++ "${CXXFLAGS[@]}" -c Windows/DLL.cpp            -o "$OUT/DLL.o"
 clang++ "${CXXFLAGS[@]}" -c 7zip/UI/Common/WorkDir.cpp -o "$OUT/WorkDir.o"
-clang++ "${CXXFLAGS[@]}" -c "$REPO/Mac/poc/m1t5_link_stubs.cpp" -o "$OUT/m1t5_link_stubs.o"
+clang++ "${CXXFLAGS[@]}" -c "$REPO/Mac/SevenZipKit/platform/ZipRegistry_mac.cpp" -o "$OUT/ZipRegistry_mac.o"
 echo "  ✓"
 
 echo "==[2] SevenZipKit C++ 核心（SZNaturalCompare + SZFolderCore，唯一 INITGUID）=="
@@ -48,7 +48,7 @@ clang++ -arch arm64 \
   "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/Agent.o" "$OUT/AgentProxy.o" "$OUT/ArchiveFolder.o" "$OUT/ArchiveFolderOpen.o" \
   "$OUT/UpdateCallbackAgent.o" "$OUT/AgentOut.o" "$OUT/ArchiveFolderOut.o" \
-  "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/m1t5_link_stubs.o" \
+  "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/ZipRegistry_mac.o" \
   "${ALONE_OBJS[@]}" \
   -framework Foundation -framework CoreFoundation -lz \
   -o "$OUT/test_panelmodel"

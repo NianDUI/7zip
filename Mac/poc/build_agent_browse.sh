@@ -32,8 +32,8 @@ done
 echo "==[1b] 编译 Agent 链接闭环补充：DLL / WorkDir =="
 clang++ "${FLAGS[@]}" -c Windows/DLL.cpp            -o "$OUT/DLL.o";     echo "  ✓ DLL.o"
 clang++ "${FLAGS[@]}" -c 7zip/UI/Common/WorkDir.cpp -o "$OUT/WorkDir.o"; echo "  ✓ WorkDir.o"
-echo "==[1c] 编译 M1-T5 链接桩（NWorkDir::CInfo / CompareFileNames，归属见文件头）=="
-clang++ "${FLAGS[@]}" -c "$REPO/Mac/poc/m1t5_link_stubs.cpp" -o "$OUT/m1t5_link_stubs.o"; echo "  ✓ m1t5_link_stubs.o"
+echo "==[1c] 编译 ZipRegistry_mac（plist 后端，替 NWorkDir 桩）=="
+clang++ "${FLAGS[@]}" -c "$REPO/Mac/SevenZipKit/platform/ZipRegistry_mac.cpp" -o "$OUT/ZipRegistry_mac.o"; echo "  ✓ ZipRegistry_mac.o"
 
 echo "==[2/4] 编译 agent_browse.cpp（唯一 INITGUID 单元）=="
 clang++ "${FLAGS[@]}" -c "$REPO/Mac/poc/agent_browse.cpp" -o "$OUT/agent_browse.o"
@@ -54,7 +54,7 @@ clang++ -arch arm64 \
   "$OUT/agent_browse.o" \
   "$OUT/Agent.o" "$OUT/AgentProxy.o" "$OUT/ArchiveFolder.o" "$OUT/ArchiveFolderOpen.o" \
   "$OUT/UpdateCallbackAgent.o" "$OUT/AgentOut.o" "$OUT/ArchiveFolderOut.o" \
-  "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/m1t5_link_stubs.o" \
+  "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/ZipRegistry_mac.o" \
   "${ALONE_OBJS[@]}" \
   -framework CoreFoundation -lz \
   -o "$OUT/agent_browse"
