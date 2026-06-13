@@ -15,29 +15,14 @@
 
 using namespace NWindows;
 
-// 自然排序（SZNaturalCompare.cpp，同源移植 PanelSort.cpp:14）
-extern int SZNaturalCompareUTF8(const char *a, const char *b);
+// 自然排序（SZNaturalCompare.cpp，同源移植 PanelSort.cpp:14）。wchar 版供预转键排序（M1-T9 优化）。
+extern int CompareFileNames_ForFolderList(const wchar_t *s1, const wchar_t *s2);
 
 namespace {
 
 std::string ExtOf(const std::string &name) {
   const size_t p = name.find_last_of('.');
   return (p == std::string::npos) ? std::string() : name.substr(p);
-}
-
-// 同类（都目录/都文件）项的列比较：主键相等时二级按 Name（对齐 CompareItems 的 fallback to kpidName）。
-int CmpByKey(const SZCoreItem &a, const SZCoreItem &b, SZSortKey key) {
-  int r = 0;
-  switch (key) {
-    case SZSortKey::Name:   return SZNaturalCompareUTF8(a.name.c_str(), b.name.c_str());
-    case SZSortKey::Size:   r = (a.size  < b.size)  ? -1 : (a.size  > b.size)  ? 1 : 0; break;
-    case SZSortKey::MTime:  r = (a.mtime < b.mtime) ? -1 : (a.mtime > b.mtime) ? 1 : 0; break;
-    case SZSortKey::Attrib: r = (a.attrib < b.attrib) ? -1 : (a.attrib > b.attrib) ? 1 : 0; break;
-    case SZSortKey::Type:   r = SZNaturalCompareUTF8(ExtOf(a.name).c_str(), ExtOf(b.name).c_str()); break;
-    case SZSortKey::None:   return 0;
-  }
-  if (r != 0) return r;
-  return SZNaturalCompareUTF8(a.name.c_str(), b.name.c_str());  // 二级 Name
 }
 
 // UString(UTF-32 wchar) → std::string(UTF-8)。经 7-Zip 的 UnicodeStringToMultiByte(CP_UTF8)。
@@ -79,16 +64,57 @@ struct SZFolderCore::Impl {
   void applySort() {
     const SZSortKey key = sortKey_;
     const bool asc = ascending_;
-    // 目录恒在文件前（不受升降序影响，PanelSort CompareItems:190）；
-    // 同类按 key+方向；主键相等 stable_sort 保持 LoadItems 原序（PanelSort 兜底）。
-    std::stable_sort(items.begin(), items.end(),
-        [key, asc](const SZCoreItem &a, const SZCoreItem &b) -> bool {
-          if (a.isDir != b.isDir) return a.isDir;       // 目录在前
-          if (key == SZSortKey::None) return false;
-          const int r = CmpByKey(a, b, key);
-          if (r == 0) return false;
-          return asc ? (r < 0) : (r > 0);
-        });
+    const size_t n = items.size();
+    if (n < 2) return;
+
+    // M1-T9 优化：预转 name → UString（O(n)），避免在 O(n log n) 次比较里反复 UTF-8→UString 转换。
+    std::vector<UString> nameKeys(n);
+    for (size_t i = 0; i < n; i++)
+      nameKeys[i] = MultiByteToUnicodeString(AString(items[i].name.c_str()), CP_UTF8);
+    std::vector<UString> extKeys;
+    if (key == SZSortKey::Type) {
+      extKeys.resize(n);
+      for (size_t i = 0; i < n; i++)
+        extKeys[i] = MultiByteToUnicodeString(AString(ExtOf(items[i].name).c_str()), CP_UTF8);
+    }
+
+    // 排序索引（目录恒在文件前不受方向影响 PanelSort:190；同类按 key+方向；主键相等二级按 Name；
+    // 仍相等 stable_sort 保持 LoadItems 原序）。
+    std::vector<size_t> idx(n);
+    for (size_t i = 0; i < n; i++) idx[i] = i;
+    std::stable_sort(idx.begin(), idx.end(), [&](size_t a, size_t b) -> bool {
+      const SZCoreItem &ia = items[a], &ib = items[b];
+      if (ia.isDir != ib.isDir) return ia.isDir;
+      if (key == SZSortKey::None) return false;
+      int r = 0;
+      switch (key) {
+        case SZSortKey::Name:   r = CompareFileNames_ForFolderList(nameKeys[a].Ptr(), nameKeys[b].Ptr()); break;
+        case SZSortKey::Size:   r = (ia.size  < ib.size)  ? -1 : (ia.size  > ib.size)  ? 1 : 0; break;
+        case SZSortKey::MTime:  r = (ia.mtime < ib.mtime) ? -1 : (ia.mtime > ib.mtime) ? 1 : 0; break;
+        case SZSortKey::Attrib: r = (ia.attrib < ib.attrib) ? -1 : (ia.attrib > ib.attrib) ? 1 : 0; break;
+        case SZSortKey::Type:   r = CompareFileNames_ForFolderList(extKeys[a].Ptr(), extKeys[b].Ptr()); break;
+        case SZSortKey::None:   return false;
+      }
+      if (r == 0 && key != SZSortKey::Name)
+        r = CompareFileNames_ForFolderList(nameKeys[a].Ptr(), nameKeys[b].Ptr());  // 二级 Name
+      if (r == 0) return false;
+      return asc ? (r < 0) : (r > 0);
+    });
+
+    // 按 idx 原地重排（new[i]=old[idx[i]]），省一份 items 副本（M1-T9 控峰值）。
+    std::vector<char> done(n, 0);
+    for (size_t i = 0; i < n; i++) {
+      if (done[i]) continue;
+      size_t j = i;
+      SZCoreItem tmp = std::move(items[i]);
+      for (;;) {
+        done[j] = 1;
+        const size_t src = idx[j];
+        if (src == i) { items[j] = std::move(tmp); break; }
+        items[j] = std::move(items[src]);
+        j = src;
+      }
+    }
   }
 
   void reload() {
