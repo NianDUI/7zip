@@ -357,3 +357,10 @@ SZExtractResult SZExtractCore::run(const SZExtractRequest &req, SZExtractDelegat
   res.errorMessage  = ToUtf8(errorMessage);
   return res;
 }
+
+std::string SZExtractErrorText(int opResult, bool encrypted) {
+  if (opResult == NArchive::NExtract::NOperationResult::kOK) return std::string();
+  const char *s = OpResultText((Int32)opResult, encrypted ? 1 : 0);
+  if (s) return std::string(s);
+  return std::string("Error #") + std::to_string(opResult);
+}

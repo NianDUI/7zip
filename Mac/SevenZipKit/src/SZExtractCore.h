@@ -82,3 +82,7 @@ public:
   // 同步执行解压（调用方负责放在后台线程；del 可为 nullptr=全用安全缺省）。
   static SZExtractResult run(const SZExtractRequest &req, SZExtractDelegate *del);
 };
+
+// 文件级错误码（onFileDone 的 opResult）→ 英文文案（"CRC Failed" 等，1:1 移植 console）。
+// opResult==0(kOK) 返回空串。供 GUI 错误列表显示（ObjC 外观无法访问 .cpp 内部映射表）。
+std::string SZExtractErrorText(int opResult, bool encrypted);
