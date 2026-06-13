@@ -1497,7 +1497,10 @@ Z7_COM7F_IMF(CAgentFolder::Extract(const UInt32 *indices,
   {
     pathU = us2fs(path);
     if (!pathU.IsEmpty()
-      && !NFile::NName::IsAltStreamPrefixWithColon(path))
+     #ifdef _WIN32
+      && !NFile::NName::IsAltStreamPrefixWithColon(path)  // mac 无 NTFS 备用数据流
+     #endif
+      )
     {
       NFile::NName::NormalizeDirPathPrefix(pathU);
       NFile::NDir::CreateComplexDir(pathU);
@@ -1620,8 +1623,13 @@ Z7_COM7F_IMF(CAgent::Open(
       return GetLastError_noZero_HRESULT();
     if (fi.IsDir())
       return E_FAIL;
+   #ifdef _WIN32
     _attrib = fi.Attrib;
     _isDeviceFile = fi.IsDevice;
+   #else
+    _attrib = fi.GetWinAttrib();  // POSIX: 从 st_mode 合成 Windows 属性位
+    _isDeviceFile = false;
+   #endif
     FString dirPrefix, fileName;
     if (NFile::NDir::GetFullPathAndSplit(us2fs(_archiveFilePath), dirPrefix, fileName))
     {
@@ -1667,7 +1675,11 @@ Z7_COM7F_IMF(CAgent::Open(
     if (!inStream)
     {
       arc.MTime.Set_From_FiTime(fi.MTime);
+     #ifdef _WIN32
       arc.MTime.Def = !fi.IsDevice;
+     #else
+      arc.MTime.Def = true;  // POSIX: 普通文件，无设备文件概念
+     #endif
     }
     
     ArchiveType = GetTypeOfArc(arc);

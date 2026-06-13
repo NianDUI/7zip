@@ -6,16 +6,23 @@
 
 #include "../../../Common/StringToInt.h"
 #include "../../../Windows/DLL.h"
+#ifdef _WIN32
 #include "../../../Windows/ResourceString.h"
+#endif
 
 #include "Agent.h"
 
+#ifdef _WIN32
 extern HINSTANCE g_hInstance;
 static const UINT kIconTypesResId = 100;
+#endif
 
+// POSIX(macOS): 图标映射改由 SevenZipKit 用 UTType/Asset Catalog 提供（M1-T4），
+// 此处不加载 Windows PE 资源；LoadIcons 在非 Windows 下为空实现，IconPairs 留空。
 void CCodecIcons::LoadIcons(HMODULE m)
 {
   IconPairs.Clear();
+ #ifdef _WIN32
   UString iconTypes;
   NWindows::MyLoadString(m, kIconTypesResId, iconTypes);
   UStringVector pairs;
@@ -42,6 +49,9 @@ void CCodecIcons::LoadIcons(HMODULE m)
     iconPair.Ext = s.Left((unsigned)pos);
     IconPairs.Add(iconPair);
   }
+ #else
+  (void)m;
+ #endif
 }
 
 bool CCodecIcons::FindIconIndex(const UString &ext, int &iconIndex) const
@@ -75,7 +85,11 @@ void CArchiveFolderManager::LoadFormats()
     ci.LoadIcons(g_CodecsObj->Libs[i].Lib.Get_HMODULE());
   }
   #endif
+ #ifdef _WIN32
   InternalIcons.LoadIcons(g_hInstance);
+ #else
+  InternalIcons.LoadIcons(NULL);  // POSIX: 空加载，扩展名→图标走 UTType（M1-T4）
+ #endif
   WasLoaded = true;
 }
 
