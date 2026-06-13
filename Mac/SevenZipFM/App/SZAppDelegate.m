@@ -135,7 +135,7 @@
 - (void)refreshChrome {
   _address.stringValue = _panel.addressText;
   _status.stringValue = _panel.statusText;
-  _window.title = [NSString stringWithFormat:@"7-Zip — %@", _archiveURL.lastPathComponent];
+  _window.title = [NSString stringWithFormat:@"7-Zip · %@", _archiveURL.path];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app { return YES; }
