@@ -48,6 +48,37 @@
 
 `OpenFolderFile` 的 `arcFormat` 透传 `CAgent::Open → ParseOpenTypes`，后者隐式 `UString(arcFormat)`；NULL → `UString(NULL)` 崩溃。**须传空串 `L""`（=自动嗅探所有格式），Windows FM 亦如此**。已写入 `agent_browse.cpp` 注释，桥接层 `SZFolderSession` 封装时须保证非 NULL。
 
+## SZFolderSession ObjC 封装（M1-T5 下半场）
+
+底层导航验证后，在其上封装 `02 §4.6` 的 `SZFolderSession` ObjC API（只读路径），供 Swift/ObjC 直调。产物结构（`01 §4.2`）：
+
+```
+Mac/SevenZipKit/
+├── include/SevenZipKit/   SZError.h  SZFolderItem.h  SZFolderSession.h   ← 公开头：纯 Foundation
+├── src/                   SZFolderCore.{h,cpp}        ← 纯 C++ 桥接核心（唯一 INITGUID，持 7-Zip）
+│                          SZFolderSession.mm          ← ObjC 外观（仅 std→ObjC 转换）
+├── tests/                 test_szfolder.mm            ← 纯 ObjC 测试（仅公开头）
+└── build_test_szfolder.sh （一键复现）
+```
+
+### 发现 4：ObjC `BOOL` 与 7-Zip `BOOL` 冲突 → Pimpl 三层（桥接边界从原则落为编译约束）
+
+7-Zip `Common/MyWindows.h: typedef int BOOL` 与 ObjC `objc.h: typedef bool BOOL` 在同一 ObjC++ TU **类型重定义冲突**。解法是 **Pimpl 三层隔离**：
+
+| 层 | 文件 | 是否含 7-Zip 头 | 是否含 ObjC |
+|---|---|---|---|
+| 纯 C++ 核心 | `SZFolderCore.{h,cpp}` | 是（唯一 INITGUID，持 `CMyComPtr`） | 否 |
+| ObjC 外观 | `SZFolderSession.mm` | **否**（只 `#include SZFolderCore.h`） | 是 |
+| 公开头 | `SZ*.h` | 否（纯 Foundation） | 是 |
+
+→ 这把 `01 §2.2`"App 不直接 include 7-Zip C++ 头、桥接边界单一"从设计原则**落为可编译的硬约束**：`SZFolderCore.h` 只用 `std::string/uint64_t/bool` 暴露数据，7-Zip 类型/COM/`wchar_t` 语义被彻底挡在 C++ 核心内。`SZFolderCore.cpp` 用不同编译 flags（含 `-I CPP -include shim`），`.mm` 用纯 ObjC++ flags（不含 7-Zip）。两套 flags 分离写进 `build_test_szfolder.sh`。
+
+### 验收（实测）
+
+`test_szfolder`（纯 ObjC，仅依赖 SevenZipKit 公开头）端到端：`open → items → enterFolderAtIndex 多层 → enterParentFolder 上溯 → archiveErrorFlags/PhysicalSize`。`NSDate` mtime 换算正确（FILETIME 1601→1970）、`name` 末段提取正确、中文 UTF-8 往返无损、`canGoToParent` 正确。ARC 下 `SZFolderCore` C++ ivar 在 `dealloc` 自动析构（`CMyComPtr` Release）。复现：`Mac/SevenZipKit/build_test_szfolder.sh`。
+
+> 线程模型（每 session 串行队列、进度 pull、跨线程 Release 收敛，`02 §6`）本类暂按单线程；M2 引入解压/进度时落地。
+
 ## 对方案的影响
 
 - **架构不变**：lib7z.dylib + SevenZipKit(含 Agent) + AppKit 三层维持。SZFolderSession（`02 §4.6`）底层导航路径已实证可行，其 ObjC 封装可在此之上推进。
