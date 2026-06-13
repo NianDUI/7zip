@@ -8,21 +8,14 @@
 // 归属（正式实现接管点）：
 //   - NWorkDir::CInfo::Load/Save → M1-T1 ZipRegistry_mac.mm（NSUserDefaults，域 com.7zip.SevenZipFM）。
 //       此处 Load 用 SetDefault()（POSIX 默认 System 工作目录，即"同目录临时文件"语义），是合理过渡而非纯空桩。
-//   - CompareFileNames_ForFolderList → M1-T6 PanelModel 从上游 PanelSort.cpp:14 提取共享。
-//       此处 wcscmp 占位：M1-T5 只 LoadItems/GetProperty 不调 CAgentFolder::CompareItems 排序，行为不影响本测试。
+//
+// 注：CompareFileNames_ForFolderList 原为 M1-T5 wcscmp 桩，M1-T6 已由 SZNaturalCompare.cpp 提供
+//     真实自然排序（同源移植 PanelSort.cpp:14），此处不再定义。
 
 #include "Common/MyWindows.h"
 #include "7zip/UI/Common/ZipRegistry.h"
-#include <wchar.h>
 
 namespace NWorkDir {
   void CInfo::Load() { SetDefault(); }   // POSIX 默认 System 工作目录；M1-T1 改读 NSUserDefaults
   void CInfo::Save() const {}            // M1-T1 写 NSUserDefaults
-}
-
-// FM 自然排序比较（数字段按数值序）。M1-T5 仅占位以满足 Agent.o/CAgentFolder::CompareItems 的引用；
-// 真实自然排序见上游 PanelSort.cpp:14，由 M1-T6 PanelModel 统一来源。
-int CompareFileNames_ForFolderList(const wchar_t *s1, const wchar_t *s2)
-{
-  return wcscmp(s1, s2);
 }

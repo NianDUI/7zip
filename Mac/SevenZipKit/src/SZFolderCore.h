@@ -19,6 +19,9 @@ struct SZCoreItem {
   uint32_t    crc    = 0;
 };
 
+/// 排序键（对齐 7zFM 列）。默认方向：Size/MTime 降序、其余升序（PanelSort.cpp:264-272）。
+enum class SZSortKey { None, Name, Size, MTime, Type, Attrib };
+
 class SZFolderCore {
 public:
   SZFolderCore();
@@ -36,6 +39,12 @@ public:
   bool enterFolderAtIndex(size_t index);   // BindToFolder
   bool enterParentFolder();                // BindToParentFolder
   void setFlatMode(bool flat);             // IFolderSetFlatMode
+
+  /// 排序当前层 items（目录恒在文件前、不分升降序；同类按 key+方向，主键相等二级按 Name；
+  /// 对齐 PanelSort.cpp CompareItems）。导航后保持当前排序。
+  void setSort(SZSortKey key, bool ascending);
+  SZSortKey sortKey() const;
+  bool sortAscending() const;
 
   uint32_t archiveErrorFlags();            // kpidErrorFlags（第 0 层）
   uint64_t archivePhysicalSize();          // kpidPhySize

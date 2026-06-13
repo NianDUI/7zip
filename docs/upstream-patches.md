@@ -15,6 +15,14 @@
 
 > 另有零侵入预包含 shim `Mac/compat/win_compat_mac.h`（不改上游，`-include` 注入）：补 `INVALID_FILE_ATTRIBUTES` 宏、`UINT64` 类型别名、`HMODULE` 类型别名（与 `Windows/DLL.h:9` 一致；internal codecs 编译时 LoadCodecs.h 不引 DLL.h 致 `Agent.h:335 CCodecIcons::LoadIcons(HMODULE)` 缺类型，补此即可，external 模式无影响）。
 
+> **移植副本**（非改上游：mac 侧同源复制上游纯函数，因其宿主文件不可单独编译；升版须核对来源）：
+>
+> | mac 文件 | 上游来源 | 原因 | 升版核对点 |
+> |---|---|---|---|
+> | `Mac/SevenZipKit/src/SZNaturalCompare.cpp` | `PanelSort.cpp:14` `CompareFileNames_ForFolderList` | 宿主 `PanelSort.cpp` 经 `Panel.h` 拖 `ShlObj.h`，macOS 不可单编 | `PanelSort.cpp:14-51` |
+>
+> 逐行同源副本，C++ 符号名一致：一份满足 Agent.o(`CAgentFolder::CompareItems`) 链接 + `SZFolderCore` 排序，与 7zFM 自然排序 1:1（M1-T6，替换 M1-T5 的 wcscmp 桩）。
+
 > **为何写路径（P3/P4）在 M1（只读浏览）就需要落实**：`CAgent`/`CAgentFolder` 读写一体（单一类多继承读 `IFolderFolder` + 写 `IFolderOperations` 全部虚方法）。`OpenFolderFile` 内 `new CAgent` 实例化在**链接期**强制要求完整 vtable，即写路径方法符号（`AgentOut.cpp`/`ArchiveFolderOut.cpp` 定义）必须存在。故只读浏览无法"只链接读路径子集"——这是 M1-T3 报告"写路径留 M3"在单文件 `.o` 编译层未暴露、链接成可执行才显现的盲区。M1-T5 已据此把写路径 2 文件的编译补丁前移落实（运行仍只走读路径）。
 
 ---

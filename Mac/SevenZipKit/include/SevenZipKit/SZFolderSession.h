@@ -5,6 +5,15 @@
 #import "SZFolderItem.h"
 NS_ASSUME_NONNULL_BEGIN
 
+/// 排序列（对应 7zFM 列）。默认方向：Size/Modified 降序，其余升序（PanelSort.cpp:264-272）。
+typedef NS_ENUM(NSInteger, SZSortColumn) {
+    SZSortColumnName = 0,
+    SZSortColumnSize,
+    SZSortColumnModified,
+    SZSortColumnType,
+    SZSortColumnAttributes,
+};
+
 /// 一个 session 对应一个打开的归档。所有方法须在创建它的线程串行使用
 /// （同一 IInArchive 禁并发，IArchive.h:305-308；正式版每 session 持串行队列，本类先约定单线程）。
 @interface SZFolderSession : NSObject
@@ -31,6 +40,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 平铺模式（IFolderSetFlatMode）：YES = 递归展开为单层列表。
 - (void)setFlatMode:(BOOL)flat;
+
+/// 设置排序（重排 items；目录恒在文件前不受方向影响，对齐 7zFM）。导航后保持当前排序。
+- (void)setSortColumn:(SZSortColumn)column ascending:(BOOL)ascending;
+@property (nonatomic, readonly) SZSortColumn sortColumn;
+@property (nonatomic, readonly) BOOL sortAscending;
 
 /// 归档级属性（IGetFolderArcProps → GetArcProp，第 0 层）。
 @property (nonatomic, readonly) uint32_t archiveErrorFlags;      // kpidErrorFlags（0=无错误）

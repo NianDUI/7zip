@@ -42,8 +42,25 @@ static NSString *SZStr(const std::string &s) {
 
 #pragma mark - SZFolderSession
 
+static SZSortKey SZKeyFromColumn(SZSortColumn c) {
+  switch (c) {
+    case SZSortColumnName:       return SZSortKey::Name;
+    case SZSortColumnSize:       return SZSortKey::Size;
+    case SZSortColumnModified:   return SZSortKey::MTime;
+    case SZSortColumnType:       return SZSortKey::Type;
+    case SZSortColumnAttributes: return SZSortKey::Attrib;
+  }
+  return SZSortKey::Name;
+}
+
 @implementation SZFolderSession {
   SZFolderCore _core;
+  SZSortColumn _sortColumn;   // 保留 ObjC 列值（core 只存 SZSortKey）
+}
+
+- (instancetype)init {
+  if ((self = [super init])) { _sortColumn = SZSortColumnName; }   // 与 core 默认 Name/升序一致
+  return self;
 }
 
 + (instancetype)sessionWithFileURL:(NSURL *)url error:(NSError **)error {
@@ -84,6 +101,14 @@ static NSString *SZStr(const std::string &s) {
 }
 
 - (void)setFlatMode:(BOOL)flat { _core.setFlatMode(flat); }
+
+- (void)setSortColumn:(SZSortColumn)column ascending:(BOOL)ascending {
+  _sortColumn = column;
+  _core.setSort(SZKeyFromColumn(column), ascending);
+}
+- (SZSortColumn)sortColumn { return _sortColumn; }
+- (BOOL)sortAscending { return _core.sortAscending(); }
+
 - (uint32_t)archiveErrorFlags { return _core.archiveErrorFlags(); }
 - (uint64_t)archivePhysicalSize { return _core.archivePhysicalSize(); }
 
