@@ -2,6 +2,7 @@
 #import "SZPanelController.h"
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>   // UTType 图标（macOS 11+，呼应 M1-T4）
 #import "SevenZipKit/SZArchiveExtractor.h"                  // Finder 拖出延迟解压（M2-T6）
+#import "SZQuarantine.h"                                    // quarantine 传播（M2-T7）
 
 NSString *const SZColID_Name     = @"name";
 NSString *const SZColID_Size     = @"size";
@@ -230,6 +231,7 @@ NSString *const SZColID_Modified = @"modified";
       err = nil;
       [fm copyItemAtPath:src toPath:url.path error:&err];
     }
+    if (!err) SZApplyQuarantineFrom(arch, url.path);                // 网络来源标记传播（M2-T7）
   } else {
     err = [NSError errorWithDomain:@"SZ" code:1
                           userInfo:@{NSLocalizedDescriptionKey: @"拖出解压失败"}];

@@ -1,6 +1,7 @@
 // SZProgressWindowController.m —— 见 .h。纯 AppKit，依赖 SevenZipKit 公开头 SZArchiveExtractor.h。
 #import "SZProgressWindowController.h"
 #import "SevenZipKit/SZArchiveExtractor.h"
+#import "SZQuarantine.h"   // 网络来源标记传播（M2-T7）
 
 @interface SZProgressWindowController () <SZArchiveExtractDelegate>
 @end
@@ -28,6 +29,9 @@
   BOOL _testMode;
   NSString *_verb;          // "解压" / "测试"
   NSString *_archiveName;
+  NSString *_archivePath;   // 完整路径（quarantine 源，M2-T7）
+  NSString *_outputDir;
+  NSSet<NSString *> *_preSnapshot;   // 解压前 outputDir 顶层项，diff 出新增项
   void (^_completion)(BOOL);
 }
 
@@ -41,9 +45,16 @@ static NSMutableSet *g_alive;
   [g_alive addObject:self];
   _completion = [completion copy];
   _archiveName = archivePath.lastPathComponent;
+  _archivePath = archivePath;
   _testMode = options.testMode;
   _verb = options.testMode ? @"测试" : @"解压";
   _startDate = [NSDate date];
+  // 解压前快照目标目录顶层项，完成后 diff 出新增项以传播 quarantine（M2-T7）
+  _outputDir = options.testMode ? nil : options.outputDirectory;
+  if (_outputDir) {
+    NSArray *before = [NSFileManager.defaultManager contentsOfDirectoryAtPath:_outputDir error:nil];
+    _preSnapshot = before ? [NSSet setWithArray:before] : [NSSet set];
+  }
 
   [self buildWindow];
   [_window makeKeyAndOrderFront:nil];
@@ -160,6 +171,14 @@ static NSString *FormatElapsed(NSTimeInterval s) {
   _finished = YES;
   [_timer invalidate]; _timer = nil;
   [_window orderOut:nil];
+
+  // 网络来源标记传播：源归档带 quarantine 时，给本次新解出的顶层项打 quarantine（M2-T7）
+  if (ok && _outputDir && SZArchiveHasQuarantine(_archivePath)) {
+    NSArray *after = [NSFileManager.defaultManager contentsOfDirectoryAtPath:_outputDir error:nil];
+    for (NSString *name in after)
+      if (![_preSnapshot containsObject:name])
+        SZApplyQuarantineFrom(_archivePath, [_outputDir stringByAppendingPathComponent:name]);
+  }
 
   if (!_cancelled) {
     if (!ok && em.length) {
