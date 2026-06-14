@@ -52,6 +52,10 @@ extern NSString *const SZColID_Modified;
 - (void)invertSelectionInPanel;
 /// 删除当前选中项（带确认；FS 进废纸篓 / 归档重写）。
 - (void)deleteSelectionInteractive;
+/// 当前层文件系统目录绝对路径（FS）；归档返回 nil。
+- (nullable NSString *)currentDirectoryFSPath;
+/// 把本面板选中项传输到目标面板（F5 复制 / F6 移动）：FS↔FS 文件操作、归档→FS 解压、FS→归档 添加。
+- (void)transferSelectionToPanel:(SZPanelController *)dst move:(BOOL)move parent:(NSWindow *)parent;
 /// 点击列头排序（columnID→SZSortColumn，同列切向/新列默认向，逻辑在 SZPanelModel）。
 - (void)sortByColumnID:(NSString *)columnID;
 

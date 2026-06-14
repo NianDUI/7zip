@@ -182,6 +182,81 @@ NSString *const SZColID_Modified = @"modified";
   if (self.onReload) self.onReload();
 }
 
+#pragma mark - 跨面板传输（M4-T5：F5 复制 / F6 移动）
+
+- (NSString *)currentDirectoryFSPath {
+  return _source.representsArchive ? nil : _source.currentPath;
+}
+
+- (NSArray<NSString *> *)selectedFileSystemPaths {
+  NSMutableArray<NSString *> *a = [NSMutableArray array];
+  [_tableView.selectedRowIndexes enumerateIndexesUsingBlock:^(NSUInteger i, BOOL *stop) {
+    NSString *p = [self->_source fileSystemPathForIndex:i];
+    if (p) [a addObject:p];
+  }];
+  return a;
+}
+
+- (void)transferSelectionToPanel:(SZPanelController *)dst move:(BOOL)move parent:(NSWindow *)parent {
+  if (!dst || dst == self) { NSBeep(); return; }
+  NSIndexSet *rows = _tableView.selectedRowIndexes;
+  if (rows.count == 0) { NSBeep(); return; }
+  const BOOL srcArc = _source.representsArchive;
+  const BOOL dstArc = dst.source.representsArchive;
+
+  // FS → FS：复制 / 移动磁盘文件
+  if (!srcArc && !dstArc) {
+    NSString *dstDir = [dst currentDirectoryFSPath];
+    if (!dstDir) { NSBeep(); return; }
+    NSFileManager *fm = NSFileManager.defaultManager;
+    BOOL any = NO;
+    for (NSString *src in [self selectedFileSystemPaths]) {
+      NSString *to = [dstDir stringByAppendingPathComponent:src.lastPathComponent];
+      if ([to isEqualToString:src]) continue;             // 同目录跳过
+      [fm removeItemAtPath:to error:nil];                 // 目标同名先清（覆盖）
+      NSError *e = nil;
+      BOOL ok = move ? [fm moveItemAtPath:src toPath:to error:&e]
+                     : [fm copyItemAtPath:src toPath:to error:&e];
+      if (ok) any = YES;
+      else { NSAlert *al = [NSAlert alertWithError:e]; al.messageText = move ? @"移动失败" : @"复制失败"; [al runModal]; }
+    }
+    if (any) { [self refresh]; [dst refresh]; }
+    return;
+  }
+
+  // FS → 归档：把选中文件添加到目标归档当前层（move 暂等同 copy，不删源）
+  if (!srcArc && dstArc) {
+    if (!dst.source.canUpdate) { NSBeep(); return; }
+    BOOL any = NO;
+    for (NSString *p in [self selectedFileSystemPaths]) {
+      NSError *e = nil;
+      if ([dst.source addFileAtPath:p error:&e]) any = YES;
+    }
+    if (any) [dst refresh];
+    return;
+  }
+
+  // 归档 → FS：解压选中档内项到目标目录（move 暂等同 copy，不从归档删）
+  if (srcArc && !dstArc) {
+    NSString *dstDir = [dst currentDirectoryFSPath];
+    if (!dstDir || !self.archivePath) { NSBeep(); return; }
+    SZArchiveExtractOptions *o = [SZArchiveExtractOptions new];
+    o.outputDirectory = dstDir; o.pathMode = SZExtractPathModeFull;
+    o.overwriteMode = SZExtractOverwriteModeOverwrite;
+    o.selectedPaths = [self fullArchivePathsForRows:rows];
+    __weak SZPanelController *wdst = dst;
+    SZProgressWindowController *pc = [SZProgressWindowController new];
+    [pc beginExtractArchive:self.archivePath options:o completion:^(BOOL ok) { if (ok) [wdst refresh]; }];
+    return;
+  }
+
+  // 归档 → 归档：暂不支持
+  NSAlert *a = [NSAlert new];
+  a.messageText = @"暂不支持归档到归档的直接传输";
+  a.informativeText = @"请先解压到文件系统再压缩。";
+  [a addButtonWithTitle:@"好"]; [a runModal];
+}
+
 #pragma mark 地址 / 状态栏
 
 - (NSString *)addressText {

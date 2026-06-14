@@ -47,6 +47,11 @@ int main(int argc, const char **argv) {
     SetMods(AddItem(fileMenu, @"在 Finder 中显示", @selector(revealInFinder:), @"r"),
             NSEventModifierFlagCommand | NSEventModifierFlagShift);
     [fileMenu addItem:[NSMenuItem separatorItem]];
+    SetMods(AddItem(fileMenu, @"复制到另一面板", @selector(copyToOther:),
+                    [NSString stringWithFormat:@"%C", (unichar)NSF5FunctionKey]), NSEventModifierFlagFunction);
+    SetMods(AddItem(fileMenu, @"移动到另一面板", @selector(moveToOther:),
+                    [NSString stringWithFormat:@"%C", (unichar)NSF6FunctionKey]), NSEventModifierFlagFunction);
+    [fileMenu addItem:[NSMenuItem separatorItem]];
     AddItem(fileMenu, @"关闭窗口", @selector(closeWindow:), @"w");
     fileItem.submenu = fileMenu;
 
@@ -76,6 +81,8 @@ int main(int argc, const char **argv) {
     SetMods(AddItem(viewMenu, @"上级目录", @selector(goUp:),
                     [NSString stringWithFormat:@"%C", (unichar)NSUpArrowFunctionKey]),
             NSEventModifierFlagCommand);
+    [viewMenu addItem:[NSMenuItem separatorItem]];
+    AddItem(viewMenu, @"切换单/双面板", @selector(toggleTwoPanels:), @"\\");
     [viewMenu addItem:[NSMenuItem separatorItem]];
     AddItem(viewMenu, @"按名称排序", @selector(sortByName:), @"1");
     AddItem(viewMenu, @"按大小排序", @selector(sortBySize:), @"2");
