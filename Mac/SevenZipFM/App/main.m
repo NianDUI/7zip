@@ -24,6 +24,8 @@ int main(int argc, const char **argv) {
     NSMenu *appMenu = [NSMenu new];
     AddItem(appMenu, @"关于 7-Zip", NULL, @"");
     [appMenu addItem:[NSMenuItem separatorItem]];
+    AddItem(appMenu, @"文件关联…", @selector(showFileAssociations:), @",");   // 偏好位置：设双击归档默认用 7-Zip
+    [appMenu addItem:[NSMenuItem separatorItem]];
     AddItem(appMenu, @"隐藏 7-Zip", @selector(hide:), @"h");
     SetMods(AddItem(appMenu, @"隐藏其他", @selector(hideOtherApplications:), @"h"),
             NSEventModifierFlagCommand | NSEventModifierFlagOption);

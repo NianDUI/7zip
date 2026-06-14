@@ -46,9 +46,11 @@ clang "${OBJC[@]}" -c "$FM/Progress/SZDockProgress.m"            -o "$OUT/SZDock
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZExtractDialogController.m"   -o "$OUT/SZExtractDialogController.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZCompressDialogController.m"  -o "$OUT/SZCompressDialogController.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZHashResultController.m"     -o "$OUT/SZHashResultController.o"
+clang "${OBJC[@]}" -c "$FM/Dialogs/SZFileAssocController.m"     -o "$OUT/SZFileAssocController.o"
 clang "${OBJC[@]}" -c "$FM/Shell/SZShellCommand.m"              -o "$OUT/SZShellCommand.o"
 clang "${OBJC[@]}" -c "$FM/Finder/SZFinderSync.m"              -o "$OUT/SZFinderSync.o"
 clang "${OBJC[@]}" -c "$FM/Util/SZQuarantine.m"                  -o "$OUT/SZQuarantine.o"
+clang "${OBJC[@]}" -c "$FM/Util/SZEditWatcher.m"                 -o "$OUT/SZEditWatcher.o"
 clang "${OBJC[@]}" -c "$FM/App/SZAppDelegate.m"                  -o "$OUT/SZAppDelegate.o"
 clang "${OBJC[@]}" -c "$FM/App/main.m"                           -o "$OUT/main.o"
 echo "  ✓"
@@ -64,7 +66,7 @@ for o in "$ALONE"/*.o; do
 done
 clang++ -arch arm64 \
   "$OUT/main.o" "$OUT/SZAppDelegate.o" "$OUT/SZPanelController.o" "$OUT/SZProgressWindowController.o" "$OUT/SZDockProgress.o" \
-  "$OUT/SZExtractDialogController.o" "$OUT/SZCompressDialogController.o" "$OUT/SZHashResultController.o" "$OUT/SZShellCommand.o" "$OUT/SZQuarantine.o" \
+  "$OUT/SZExtractDialogController.o" "$OUT/SZCompressDialogController.o" "$OUT/SZHashResultController.o" "$OUT/SZFileAssocController.o" "$OUT/SZShellCommand.o" "$OUT/SZQuarantine.o" "$OUT/SZEditWatcher.o" \
   "$OUT/SZPanelModel.o" "$OUT/SZFSDataSource.o" "$OUT/SZFolderItem.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/SZArchiveExtractor.o" "$OUT/SZExtractCore.o" \
   "$OUT/SZArchiveCompressor.o" "$OUT/SZCompressCore.o" \
@@ -74,7 +76,7 @@ clang++ -arch arm64 \
   "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/ZipRegistry_mac.o" \
   "${ALONE_OBJS[@]}" \
   -framework AppKit -framework Foundation -framework CoreFoundation \
-  -framework UniformTypeIdentifiers -lz \
+  -framework UniformTypeIdentifiers -framework CoreServices -lz \
   -o "$OUT/SevenZipFM.bin"
 echo "  ✓"
 

@@ -9,6 +9,7 @@
 #import "SZProgressWindowController.h"                      // 右键解压/测试/压缩进度窗
 #import "SevenZipKit/SZArchiveCompressor.h"                // SZCompressOptions
 #import "SZHashResultController.h"                          // 右键校验和（CRC/SHA，M5）
+#import "SZEditWatcher.h"                                   // 归档内文件编辑回写（M4-T7）
 
 NSString *const SZColID_Name     = @"name";
 NSString *const SZColID_Size     = @"size";
@@ -523,11 +524,18 @@ NSString *const SZColID_Modified = @"modified";
   o.overwriteMode = SZExtractOverwriteModeOverwrite; o.selectedPaths = @[fullPath];
 
   NSString *extracted = [tmp stringByAppendingPathComponent:fullPath];
+  NSString *arcPath = self.archivePath;            // 捕获当前归档磁盘路径（block 执行时面板可能已切走）
+  BOOL canWriteback = _source.canUpdate;           // 仅可更新格式才登记编辑回写
   __weak typeof(self) ws = self;
   _openExtractor = [SZArchiveExtractor new];
-  [_openExtractor extractArchive:self.archivePath options:o delegate:nil
+  [_openExtractor extractArchive:arcPath options:o delegate:nil
                       completion:^(BOOL ok, uint64_t nf, uint64_t nfe, uint64_t noe, NSString *em) {
-    if (ok) [NSWorkspace.sharedWorkspace openURL:[NSURL fileURLWithPath:extracted]];
+    if (ok) {
+      [NSWorkspace.sharedWorkspace openURL:[NSURL fileURLWithPath:extracted]];
+      // 登记编辑回写：切回 app 时若该临时文件被外部程序改动，询问是否更新回归档（M4-T7）
+      if (canWriteback)
+        [[SZEditWatcher shared] watchFile:extracted inArchive:arcPath internalPath:fullPath];
+    }
     typeof(self) ss = ws;
     if (ss) ss->_openExtractor = nil;
   }];

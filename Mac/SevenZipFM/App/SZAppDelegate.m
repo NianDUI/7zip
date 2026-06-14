@@ -6,6 +6,8 @@
 #import "SZExtractDialogController.h"
 #import "SZCompressDialogController.h"
 #import "SZHashResultController.h"
+#import "SZFileAssocController.h"
+#import "SZEditWatcher.h"
 #import "SZShellCommand.h"
 #import "SevenZipKit/SZPanelModel.h"
 #import "SevenZipKit/SZFSDataSource.h"
@@ -318,7 +320,11 @@
 
 - (void)goUp:(id)sender { if ([self.activePanel goToParent]) [self refreshChrome]; }
 - (void)refresh:(id)sender { [self.activePanel refresh]; }
-- (void)appDidBecomeActive:(NSNotification *)note { for (int s = 0; s < 2; s++) if (!_panel[s].inArchive) [_panel[s] refresh]; }
+- (void)appDidBecomeActive:(NSNotification *)note {
+  for (int s = 0; s < 2; s++) if (!_panel[s].inArchive) [_panel[s] refresh];
+  // 切回 app：检查归档内已打开的文件是否被外部程序修改，询问写回（M4-T7）
+  [[SZEditWatcher shared] checkAndPromptWithParentWindow:_window];
+}
 
 - (void)newFolder:(id)sender {
   if (self.activePanel.inArchive) {
@@ -383,6 +389,10 @@
   NSArray<NSString *> *methods = [sender isKindOfClass:NSMenuItem.class] ? [(NSMenuItem *)sender representedObject] : nil;
   if (methods.count == 0) methods = @[@"CRC32", @"SHA256"];
   [SZHashResultController presentForPaths:paths methods:methods parentWindow:_window];
+}
+
+- (void)showFileAssociations:(id)sender {
+  [SZFileAssocController presentWithParentWindow:_window];
 }
 
 - (void)newArchive:(id)sender {
