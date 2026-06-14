@@ -58,6 +58,8 @@
   BOOL _twoPanels;
   NSArray<NSLayoutConstraint *> *_dualConstraints;   // 双面板专属（右面板就位 + 左右等宽）
   NSArray<NSLayoutConstraint *> *_soloConstraints;   // 单面板专属（左面板 trailing 撑满）
+  NSMutableArray<NSURL *> *_pendingURLs;   // 冷启动时 openURLs 早于面板就绪 → 先缓存，didFinishLaunching 后执行
+  BOOL _launched;
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
@@ -134,6 +136,14 @@
   [NSNotificationCenter.defaultCenter addObserver:self
       selector:@selector(appDidBecomeActive:)
           name:NSApplicationDidBecomeActiveNotification object:nil];
+
+  // 面板就绪。执行冷启动期间缓存的 URL（右键/双击在 app 未运行时唤起，URL 早于本方法到达）。
+  _launched = YES;
+  if (_pendingURLs.count) {
+    NSArray<NSURL *> *pending = [_pendingURLs copy];
+    [_pendingURLs removeAllObjects];
+    [self handleURLs:pending];
+  }
 }
 
 - (NSView *)buildPanelSide:(int)side {
@@ -403,6 +413,15 @@
 
 // Finder 扩展经 NSWorkspace openURL 发来命令。解码 SZShellCommand 后分发到现有 解压/压缩/测试/哈希 流程。
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls {
+  if (!_launched) {   // 冷启动：面板尚未建好（openURLs 早于 didFinishLaunching），先缓存
+    if (!_pendingURLs) _pendingURLs = [NSMutableArray array];
+    [_pendingURLs addObjectsFromArray:urls];
+    return;
+  }
+  [self handleURLs:urls];
+}
+
+- (void)handleURLs:(NSArray<NSURL *> *)urls {
   for (NSURL *u in urls) {
     if ([u.scheme isEqualToString:@"sevenzip"]) {      // FinderSync 扩展命令
       SZShellCommand *cmd = [SZShellCommand commandFromURL:u];
