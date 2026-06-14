@@ -278,8 +278,11 @@ NSString *const SZColID_Modified = @"modified";
   NSUInteger n = _source.items.count, sel = _source.selectedCount;
   NSString *base = [NSString stringWithFormat:@"%lu 项", (unsigned long)n];
   if (sel > 0) {
-    NSString *sz = [_sizeFmt stringFromByteCount:(long long)_source.selectedSize];
-    return [NSString stringWithFormat:@"%@，选中 %lu（%@）", base, (unsigned long)sel, sz];
+    if (_source.selectedSize > 0) {   // 选中含文件 → 附带合计大小；全是文件夹则只报数量
+      NSString *sz = [_sizeFmt stringFromByteCount:(long long)_source.selectedSize];
+      return [NSString stringWithFormat:@"%@，选中 %lu（%@）", base, (unsigned long)sel, sz];
+    }
+    return [NSString stringWithFormat:@"%@，选中 %lu", base, (unsigned long)sel];
   }
   return base;
 }

@@ -75,12 +75,12 @@
   NSView *rightView = [self buildPanelSide:1];
 
   // 工具栏（作用于活动面板）
-  NSButton *upBtn      = [NSButton buttonWithTitle:@"↑ 上级" target:self action:@selector(goUp:)];
-  NSButton *copyBtn    = [NSButton buttonWithTitle:@"复制→" target:self action:@selector(copyToOther:)];
-  NSButton *moveBtn    = [NSButton buttonWithTitle:@"移动→" target:self action:@selector(moveToOther:)];
-  NSButton *extractBtn = [NSButton buttonWithTitle:@"解压" target:self action:@selector(extractTo:)];
-  NSButton *testBtn    = [NSButton buttonWithTitle:@"测试" target:self action:@selector(testArchive:)];
-  NSButton *panelsBtn  = [NSButton buttonWithTitle:@"单/双" target:self action:@selector(toggleTwoPanels:)];
+  NSButton *upBtn      = [self toolButton:@"arrow.up"            title:@"上级" action:@selector(goUp:)];
+  NSButton *copyBtn    = [self toolButton:@"doc.on.doc"          title:@"复制" action:@selector(copyToOther:)];
+  NSButton *moveBtn    = [self toolButton:@"arrow.right"         title:@"移动" action:@selector(moveToOther:)];
+  NSButton *extractBtn = [self toolButton:@"arrow.down.doc"      title:@"解压" action:@selector(extractTo:)];
+  NSButton *testBtn    = [self toolButton:@"checkmark.circle"    title:@"测试" action:@selector(testArchive:)];
+  NSButton *panelsBtn  = [self toolButton:@"rectangle.split.2x1" title:@"单/双" action:@selector(toggleTwoPanels:)];
   NSStackView *topRow = [NSStackView stackViewWithViews:@[upBtn, copyBtn, moveBtn, extractBtn, testBtn, panelsBtn]];
   topRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
   topRow.spacing = 8;
@@ -135,12 +135,20 @@
 }
 
 - (NSView *)buildPanelSide:(int)side {
-  NSTextField *addr = [NSTextField labelWithString:@"/"];
+  NSTextField *addr = [[NSTextField alloc] init];
+  addr.editable = YES;
+  addr.selectable = YES;
+  addr.bezeled = YES;
+  addr.bezelStyle = NSTextFieldSquareBezel;
   addr.drawsBackground = YES;
   addr.backgroundColor = NSColor.clearColor;
   addr.font = [NSFont systemFontOfSize:11];
   addr.lineBreakMode = NSLineBreakByTruncatingMiddle;
   addr.maximumNumberOfLines = 1;
+  addr.placeholderString = @"输入路径回车跳转";
+  addr.target = self;
+  addr.action = @selector(addressEntered:);
+  [addr.cell setSendsActionOnEndEditing:NO];   // 仅回车触发，失焦不跳转
 
   SZTableView *table = [SZTableView new];
   table.usesAlternatingRowBackgroundColors = YES;
@@ -168,6 +176,14 @@
   _addr[side] = addr;
   _panelView[side] = col;
   return col;
+}
+
+- (NSButton *)toolButton:(NSString *)symbol title:(NSString *)title action:(SEL)action {
+  NSButton *b = [NSButton buttonWithTitle:title target:self action:action];
+  NSImage *img = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:title];
+  if (img) { b.image = img; b.imagePosition = NSImageLeading; }
+  b.toolTip = title;
+  return b;
 }
 
 #pragma mark 活动面板
@@ -252,6 +268,25 @@
   [self installSource:[SZFSDataSource sourceWithDirectoryPath:url.path.stringByDeletingLastPathComponent] onSide:_activeSide];
   [_panel[_activeSide] pushArchiveAtFSPath:url.path];
   [self refreshChrome];
+}
+
+// 地址栏回车：输入目录→进目录；输入归档→开归档；无效→beep 并恢复显示。
+- (void)addressEntered:(NSTextField *)sender {
+  int side = (sender == _addr[1]) ? 1 : 0;
+  NSString *path = sender.stringValue.stringByExpandingTildeInPath.stringByStandardizingPath;
+  NSFileManager *fm = NSFileManager.defaultManager;
+  BOOL isDir = NO;
+  if (path.length && [fm fileExistsAtPath:path isDirectory:&isDir] && isDir) {
+    [self installSource:[SZFSDataSource sourceWithDirectoryPath:path] onSide:side];
+    [self setActiveSide:side];
+  } else if (path.length && [fm fileExistsAtPath:path] && [self isArchivePath:path]) {
+    [self installSource:[SZFSDataSource sourceWithDirectoryPath:path.stringByDeletingLastPathComponent] onSide:side];
+    [_panel[side] pushArchiveAtFSPath:path];
+    [self setActiveSide:side];
+  } else {
+    NSBeep();
+    [self refreshChromeForSide:side];   // 恢复原地址显示
+  }
 }
 
 #pragma mark chrome
