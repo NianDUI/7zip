@@ -221,15 +221,23 @@ static SZFileAssocController *gShared;
     sender.state = f.mine ? NSControlStateValueOn : NSControlStateValueOff;
     return;
   }
-  [self reload];
+  // LaunchServices 写入对 LSCopy 回读有延迟（立即回读仍是旧值，要重开窗口才对）→ 按操作意图乐观更新
+  BOOL on = (sender.state == NSControlStateValueOn);
+  f.mine = on;
+  f.currentHandler = on ? _bundleID : target;
+  [_table reloadData];
 }
 
 - (void)setAll:(BOOL)on {
   for (SZAssocFormat *f in _formats) {
     if (!on && !f.fallback) continue;   // 不可取消的跳过
-    SZSetHandler(f.uti, on ? _bundleID : f.fallback);
+    NSString *target = on ? _bundleID : f.fallback;
+    if (SZSetHandler(f.uti, target) == noErr) {   // 乐观更新（同 toggleRow，避开 LS 回读延迟）
+      f.mine = on;
+      f.currentHandler = target;
+    }
   }
-  [self reload];
+  [_table reloadData];
 }
 
 - (void)assocCheckAll:(id)sender   { [self setAll:YES]; }
