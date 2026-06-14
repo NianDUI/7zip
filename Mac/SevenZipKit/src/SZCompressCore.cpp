@@ -187,6 +187,9 @@ SZCompressResult SZCompressCore::run(const SZCompressRequest &req, SZCompressDel
     else { std::string n = kv.substr(0, eq); AddProp(P, n.c_str(), ToUString(kv.substr(eq + 1))); }
   }
 
+  // 分卷（→ archive.7z.001/.002…；解压侧引擎自动探测序列）
+  if (req.volumeSize) options.VolumesSizes.Add(req.volumeSize);
+
   // 输入文件 censor（每个磁盘路径 AddPreItem_NoWildcard）
   NWildcard::CCensor censor;
   for (size_t i = 0; i < req.inputPaths.size(); i++)

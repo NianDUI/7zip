@@ -22,6 +22,7 @@ int main(int argc, char **argv) {
     else if (a == "-p" && i + 1 < argc) { req.hasPassword = true; req.password = argv[++i]; }
     else if (a == "-f" && i + 1 < argc) req.format = argv[++i];
     else if (a == "-mt" && i + 1 < argc) req.threads = atoi(argv[++i]);
+    else if (a == "-v" && i + 1 < argc) req.volumeSize = strtoull(argv[++i], nullptr, 10);
     else if (a == "-he") req.encryptHeader = true;
     else req.inputPaths.push_back(a);
   }

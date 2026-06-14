@@ -88,5 +88,14 @@ rm -f "$OUT/he.7z"; rm -rf "$OUT/back_he"
 ( cd "$OUT" && "$OUT/7zz" x -y -ppw -o"back_he" he.7z >/dev/null 2>&1 )
 if diff -r "$OUT/src" "$OUT/back_he/src" >/dev/null 2>&1; then echo "  ✓ -he roundtrip 字节一致"; else echo "  ✗ -he 不一致"; FAIL=1; fi
 
+echo "===== F) 分卷压缩（每卷 20000B → .7z.001/.002…）+ 合并解压 ====="
+rm -f "$OUT"/vol.7z.*; rm -rf "$OUT/back_vol"
+( cd "$OUT" && "$OUT/test_compress" vol.7z src -v 20000 )
+NVOL=$(ls "$OUT"/vol.7z.* 2>/dev/null | wc -l | tr -d ' ')
+echo "  生成卷数：$NVOL"
+if [ "$NVOL" -ge 2 ]; then echo "  ✓ 已分卷（≥2 卷）"; else echo "  ✗ 未分卷"; FAIL=1; fi
+( cd "$OUT" && "$OUT/7zz" x -y -o"back_vol" vol.7z.001 >/dev/null 2>&1 )
+if diff -r "$OUT/src" "$OUT/back_vol/src" >/dev/null 2>&1; then echo "  ✓ 从 .001 合并解压字节一致"; else echo "  ✗ 合并解压不一致"; FAIL=1; fi
+
 echo ""
 [ "$FAIL" = 0 ] && echo "===== M3-T4 压缩核心全部通过 =====" || { echo "===== 有用例失败 ====="; exit 1; }

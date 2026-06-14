@@ -34,6 +34,7 @@ struct SZCompressRequest {
   bool hasPassword = false;
   std::string password;
   bool encryptHeader = false;              // 加密文件名（7z -mhe=on）
+  uint64_t volumeSize = 0;                 // 分卷大小（字节）；0=不分卷（→ .001/.002…）
   std::vector<std::string> extraProperties; // 额外 "name=value" 属性（透传，覆盖以上）
 };
 
