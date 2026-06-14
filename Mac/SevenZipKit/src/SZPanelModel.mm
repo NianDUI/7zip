@@ -60,6 +60,10 @@
   return [_session renameItemAtIndex:index toName:newName error:error];
 }
 
+- (BOOL)addFileAtPath:(NSString *)fsPath error:(NSError **)error {
+  return [_session addFileAtPath:fsPath error:error];
+}
+
 #pragma mark 排序
 
 - (void)sortByColumn:(SZSortColumn)column {

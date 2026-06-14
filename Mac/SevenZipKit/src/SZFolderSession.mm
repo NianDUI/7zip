@@ -141,4 +141,12 @@ static SZSortKey SZKeyFromColumn(SZSortColumn c) {
   return NO;
 }
 
+- (BOOL)addFileAtPath:(NSString *)fsPath error:(NSError **)error {
+  const int rc = _core.addFile(fsPath.fileSystemRepresentation ? fsPath.fileSystemRepresentation : "");
+  if (rc == 0) return YES;
+  if (error) *error = [NSError errorWithDomain:SZErrorDomain
+      code:(rc == -1 ? SZErrorUnknown : SZErrorHResult) userInfo:@{@"SZUnderlyingHRESULT": @(rc)}];
+  return NO;
+}
+
 @end

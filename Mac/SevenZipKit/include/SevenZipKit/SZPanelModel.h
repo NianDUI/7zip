@@ -53,6 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) BOOL canUpdate;
 - (BOOL)deleteItemsAtIndexes:(NSIndexSet *)indexes error:(NSError * _Nullable * _Nullable)error;
 - (BOOL)renameItemAtIndex:(NSUInteger)index toName:(NSString *)newName error:(NSError * _Nullable * _Nullable)error;
+- (BOOL)addFileAtPath:(NSString *)fsPath error:(NSError * _Nullable * _Nullable)error;
 
 @end
 

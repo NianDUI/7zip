@@ -61,6 +61,8 @@ typedef NS_ENUM(NSInteger, SZSortColumn) {
 - (BOOL)deleteItemsAtIndexes:(NSIndexSet *)indexes error:(NSError * _Nullable * _Nullable)error;
 /// 重命名当前层某条目。
 - (BOOL)renameItemAtIndex:(NSUInteger)index toName:(NSString *)newName error:(NSError * _Nullable * _Nullable)error;
+/// 把外部磁盘文件添加到当前层（拖入归档）。
+- (BOOL)addFileAtPath:(NSString *)fsPath error:(NSError * _Nullable * _Nullable)error;
 
 @end
 

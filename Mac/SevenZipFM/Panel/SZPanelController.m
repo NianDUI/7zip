@@ -109,8 +109,38 @@ NSString *const SZColID_Modified = @"modified";
   tableView.doubleAction = @selector(onDoubleClick:);
   tableView.target = self;
   [tableView setDraggingSourceOperationMask:NSDragOperationCopy forLocal:NO];   // 拖出到 Finder（M2-T6）
+  [tableView registerForDraggedTypes:@[NSPasteboardTypeFileURL]];               // 接收 Finder 文件拖入（M3）
   tableView.menu = [self buildContextMenu];                                     // 右键菜单（M3-T5 GUI 接入）
   [tableView reloadData];
+}
+
+#pragma mark - 拖入接收（Finder 文件拖入 → 添加到归档当前层，M3）
+
+- (NSDragOperation)tableView:(NSTableView *)tableView
+                validateDrop:(id<NSDraggingInfo>)info
+                 proposedRow:(NSInteger)row
+       proposedDropOperation:(NSTableViewDropOperation)op {
+  if (info.draggingSource == tableView) return NSDragOperationNone;   // 自己拖出的不接收
+  if (!_model.canUpdate) return NSDragOperationNone;                  // 只读格式不可加
+  [tableView setDropRow:-1 dropOperation:NSTableViewDropOn];          // 落到整个面板（当前层）
+  return NSDragOperationCopy;
+}
+
+- (BOOL)tableView:(NSTableView *)tableView
+       acceptDrop:(id<NSDraggingInfo>)info
+              row:(NSInteger)row
+    dropOperation:(NSTableViewDropOperation)op {
+  if (!_model.canUpdate) return NO;
+  NSArray<NSURL *> *urls = [info.draggingPasteboard
+      readObjectsForClasses:@[NSURL.class]
+                    options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+  BOOL any = NO;
+  for (NSURL *u in urls) {
+    NSError *err = nil;
+    if ([_model addFileAtPath:u.path error:&err]) any = YES;
+  }
+  if (any) [self reload];
+  return any;
 }
 
 #pragma mark - 右键上下文菜单（对齐 Windows 7zFM 归档内右键）
