@@ -174,7 +174,13 @@ static NSString *FormatElapsed(NSTimeInterval s) {
 
 - (void)refreshUI {
   if (_finished) return;
-  if (_totalBytes > 0)
+  // 总量已知（多数 7z/zip）→ 确定模式百分比；未知（.gz/.tar.gz 流式，引擎不预知解压总大小）→ 不确定动画。
+  const BOOL knownTotal = (_totalBytes > 0);
+  if (_bar.indeterminate == knownTotal) {     // 状态需切换
+    _bar.indeterminate = !knownTotal;
+    if (knownTotal) [_bar stopAnimation:nil]; else [_bar startAnimation:nil];
+  }
+  if (knownTotal)
     _bar.doubleValue = (double)_completedBytes / (double)_totalBytes;
 
   // elapsed 扣除累计暂停时长（含当前正暂停的时段），使速度/剩余时间不被暂停拉偏
@@ -182,25 +188,31 @@ static NSString *FormatElapsed(NSTimeInterval s) {
   if (_paused && _pauseStart) elapsed -= -[_pauseStart timeIntervalSinceNow];
   if (elapsed < 0) elapsed = 0;
 
-  NSString *speed = @"–", *remain = @"–";
-  if (elapsed > 0.3 && _completedBytes > 0) {
+  NSString *speed = @"–";
+  if (elapsed > 0.3 && _completedBytes > 0)
     speed = [NSString stringWithFormat:@"%@/s", FormatBytes((uint64_t)(_completedBytes / elapsed))];
-    if (_totalBytes > _completedBytes) {
-      NSTimeInterval rem = (double)(_totalBytes - _completedBytes) * elapsed / (double)_completedBytes;
-      remain = FormatElapsed(rem);
-    }
-  }
 
-  _statsLabel.stringValue = [NSString stringWithFormat:@"已用 %@ / 剩余 %@   %@ / %@   速度 %@   文件 %lu%@",
-      FormatElapsed(elapsed), remain, FormatBytes(_completedBytes), FormatBytes(_totalBytes), speed,
-      (unsigned long)_fileCount,
-      _errorCount ? [NSString stringWithFormat:@"   错误 %lu", (unsigned long)_errorCount] : @""];
+  // 状态栏：总量已知显示「剩余 + 已处理/总量」；未知只显示「已处理」（不显示误导的 Zero KB / 剩余）
+  NSMutableString *stats = [NSMutableString stringWithFormat:@"已用 %@", FormatElapsed(elapsed)];
+  if (knownTotal) {
+    NSString *remain = @"–";
+    if (elapsed > 0.3 && _completedBytes > 0 && _totalBytes > _completedBytes)
+      remain = FormatElapsed((double)(_totalBytes - _completedBytes) * elapsed / (double)_completedBytes);
+    [stats appendFormat:@" / 剩余 %@   %@ / %@", remain, FormatBytes(_completedBytes), FormatBytes(_totalBytes)];
+  } else {
+    [stats appendFormat:@"   已处理 %@", FormatBytes(_completedBytes)];
+  }
+  [stats appendFormat:@"   速度 %@   文件 %lu", speed, (unsigned long)_fileCount];
+  if (_errorCount) [stats appendFormat:@"   错误 %lu", (unsigned long)_errorCount];
+  _statsLabel.stringValue = stats;
 
   if (_currentFile) _fileLabel.stringValue = _currentFile;
 
-  const int pct = _totalBytes ? (int)(100.0 * _completedBytes / _totalBytes) : 0;
-  _window.title = [NSString stringWithFormat:@"%@%d%%  %@ %@",
-      _paused ? @"[暂停] " : @"", pct, _verb, _archiveName];
+  // 标题：总量已知显示百分比；未知只显示动作 + 档名
+  NSString *pctPrefix = knownTotal
+      ? [NSString stringWithFormat:@"%d%%  ", (int)(100.0 * _completedBytes / _totalBytes)] : @"";
+  _window.title = [NSString stringWithFormat:@"%@%@%@ %@",
+      _paused ? @"[暂停] " : @"", pctPrefix, _verb, _archiveName];
 }
 
 - (void)onPauseResume:(id)sender {
