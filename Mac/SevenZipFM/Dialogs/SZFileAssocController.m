@@ -32,7 +32,7 @@ static OSStatus SZSetHandler(NSString *uti, NSString *bundleID) {
 
 #pragma mark - 控制器
 
-@interface SZFileAssocController () <NSTableViewDataSource, NSTableViewDelegate>
+@interface SZFileAssocController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
 @end
 
 @implementation SZFileAssocController {
@@ -61,6 +61,7 @@ static SZFileAssocController *gShared;
     _bundleID = NSBundle.mainBundle.bundleIdentifier ?: @"com.niandui.SevenZipFM";
     [self buildFormats];
     [self buildUI];
+    w.delegate = self;   // 监听窗口重新成为前台（系统确认窗关闭后）→ 回读真实状态纠正
   }
   return self;
 }
@@ -243,5 +244,14 @@ static SZFileAssocController *gShared;
 - (void)assocCheckAll:(id)sender   { [self setAll:YES]; }
 - (void)assocUncheckAll:(id)sender { [self setAll:NO]; }
 - (void)assocClose:(id)sender      { [self.window close]; }
+
+#pragma mark - 窗口委托
+
+// macOS 改默认 App 会弹系统确认窗（用户可拒绝）；其关闭后本窗重新成为 key，
+// 此时实际更改已定（LS DB 已最终），回读真实状态纠正之前的乐观显示。
+- (void)windowDidBecomeKey:(NSNotification *)note {
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)),
+                 dispatch_get_main_queue(), ^{ [self reload]; });
+}
 
 @end
