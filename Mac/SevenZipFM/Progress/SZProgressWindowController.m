@@ -1,13 +1,15 @@
 // SZProgressWindowController.m —— 见 .h。纯 AppKit，依赖 SevenZipKit 公开头 SZArchiveExtractor.h。
 #import "SZProgressWindowController.h"
 #import "SevenZipKit/SZArchiveExtractor.h"
+#import "SevenZipKit/SZArchiveCompressor.h"   // 压缩（M3-T2）
 #import "SZQuarantine.h"   // 网络来源标记传播（M2-T7）
 
-@interface SZProgressWindowController () <SZArchiveExtractDelegate>
+@interface SZProgressWindowController () <SZArchiveExtractDelegate, SZArchiveCompressDelegate>
 @end
 
 @implementation SZProgressWindowController {
   SZArchiveExtractor *_extractor;
+  SZArchiveCompressor *_compressor;
   NSWindow *_window;
   NSProgressIndicator *_bar;
   NSTextField *_titleLabel;     // 状态行（正在解压/测试）
@@ -81,6 +83,29 @@ static NSMutableSet *g_alive;
   opts.testMode = YES;
   if (password.length) opts.password = password;
   [self beginExtractArchive:archivePath options:opts completion:completion];
+}
+
+- (void)beginCompressToArchive:(NSString *)archivePath
+                       options:(SZCompressOptions *)options
+                    completion:(void (^)(BOOL))completion {
+  if (!g_alive) g_alive = [NSMutableSet new];
+  [g_alive addObject:self];
+  _completion = [completion copy];
+  _archiveName = archivePath.lastPathComponent;
+  _verb = @"压缩";
+  _startDate = [NSDate date];
+
+  [self buildWindow];
+  [_window makeKeyAndOrderFront:nil];
+
+  _compressor = [SZArchiveCompressor new];
+  __weak typeof(self) wself = self;
+  [_compressor compressToArchive:archivePath options:options delegate:self
+                      completion:^(BOOL ok, uint64_t size, NSString *em) {
+    [wself finishWithOK:ok errorMessage:em];
+  }];
+  _timer = [NSTimer scheduledTimerWithTimeInterval:0.2 target:self
+                                          selector:@selector(refreshUI) userInfo:nil repeats:YES];
 }
 
 #pragma mark - UI 构建
@@ -181,6 +206,7 @@ static NSString *FormatElapsed(NSTimeInterval s) {
 - (void)onPauseResume:(id)sender {
   _paused = !_paused;
   [_extractor setPaused:_paused];
+  [_compressor setPaused:_paused];
   _pauseButton.title = _paused ? @"继续" : @"暂停";
   if (_paused) {
     _pauseStart = [NSDate date];
@@ -197,6 +223,7 @@ static NSString *FormatElapsed(NSTimeInterval s) {
   _cancelButton.enabled = NO;
   _titleLabel.stringValue = @"正在取消…";
   [_extractor cancel];
+  [_compressor cancel];   // nil 调用安全：解压/压缩仅一个非空
 }
 
 - (void)finishWithOK:(BOOL)ok errorMessage:(NSString *)em {
@@ -276,17 +303,36 @@ static NSString *FormatElapsed(NSTimeInterval s) {
 }
 
 - (NSString *)extractorAskPassword:(SZArchiveExtractor *)ex {
+  return [self askPassword];
+}
+
+- (NSString *)askPassword {
   NSAlert *a = [NSAlert new];
   a.messageText = @"输入密码";
-  a.informativeText = [NSString stringWithFormat:@"归档「%@」已加密，请输入密码：", _archiveName];
+  a.informativeText = [NSString stringWithFormat:@"归档「%@」需要密码：", _archiveName];
   NSSecureTextField *tf = [[NSSecureTextField alloc] initWithFrame:NSMakeRect(0, 0, 260, 24)];
   a.accessoryView = tf;
   [a addButtonWithTitle:@"确定"];
   [a addButtonWithTitle:@"取消"];
-  // 让密码框获得焦点
   [a.window setInitialFirstResponder:tf];
   if ([a runModal] == NSAlertFirstButtonReturn) return tf.stringValue;
   return nil; // 取消
+}
+
+#pragma mark - SZArchiveCompressDelegate（压缩进度，M3-T2）
+
+- (void)compressor:(SZArchiveCompressor *)c didUpdateFraction:(double)fraction
+    completedBytes:(uint64_t)completed totalBytes:(uint64_t)total {
+  _completedBytes = completed; _totalBytes = total;
+}
+- (void)compressor:(SZArchiveCompressor *)c willAddFile:(NSString *)name {
+  _currentFile = name; _fileCount++;
+}
+- (void)compressor:(SZArchiveCompressor *)c scanError:(NSString *)path message:(NSString *)message {
+  _errorCount++;
+}
+- (NSString *)compressorAskPassword:(SZArchiveCompressor *)c {
+  return [self askPassword];
 }
 
 @end

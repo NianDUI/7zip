@@ -4,6 +4,7 @@
 // 覆盖/密码询问在主线程同步弹 NSAlert（引擎工作线程经信号量阻塞等返回）。
 #import <Cocoa/Cocoa.h>
 @class SZArchiveExtractOptions;
+@class SZCompressOptions;
 NS_ASSUME_NONNULL_BEGIN
 
 @interface SZProgressWindowController : NSObject
@@ -18,6 +19,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)beginTestArchive:(NSString *)archivePath
                 password:(nullable NSString *)password
               completion:(nullable void (^)(BOOL ok))completion;
+
+/// 压缩（M3-T2）：弹进度窗并把 options.inputPaths 压缩到 archivePath。
+- (void)beginCompressToArchive:(NSString *)archivePath
+                       options:(SZCompressOptions *)options
+                    completion:(nullable void (^)(BOOL ok))completion;
 
 @end
 

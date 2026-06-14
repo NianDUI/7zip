@@ -3,8 +3,10 @@
 #import "SZPanelController.h"
 #import "SZProgressWindowController.h"
 #import "SZExtractDialogController.h"
+#import "SZCompressDialogController.h"
 #import "SevenZipKit/SZPanelModel.h"
 #import "SevenZipKit/SZArchiveExtractor.h"
+#import "SevenZipKit/SZArchiveCompressor.h"
 
 #pragma mark - 键盘可达的 NSTableView
 
@@ -164,6 +166,34 @@
   if (!_archiveURL) { NSBeep(); return; }
   SZProgressWindowController *pc = [SZProgressWindowController new];
   [pc beginTestArchive:_archiveURL.path password:nil completion:nil];
+}
+
+// 新建归档（M3-T2）：选输入文件 → 压缩对话框 → 进度窗。不依赖已打开归档。
+- (void)newArchive:(id)sender {
+  NSOpenPanel *p = [NSOpenPanel openPanel];
+  p.canChooseFiles = YES;
+  p.canChooseDirectories = YES;
+  p.allowsMultipleSelection = YES;
+  p.prompt = @"添加";
+  p.message = @"选择要压缩的文件或文件夹";
+  if ([p runModal] != NSModalResponseOK || p.URLs.count == 0) return;
+
+  NSMutableArray<NSString *> *inputs = [NSMutableArray array];
+  for (NSURL *u in p.URLs) [inputs addObject:u.path];
+  NSString *first = p.URLs.firstObject.path;
+  NSString *base = [first.lastPathComponent stringByDeletingPathExtension];
+  if (!base.length) base = @"archive";
+  NSString *defArc = [[first stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:[base stringByAppendingPathExtension:@"7z"]];
+
+  [SZCompressDialogController presentForInputs:inputs
+                            defaultArchivePath:defArc
+                                  parentWindow:_window
+                                    completion:^(NSString *archivePath, SZCompressOptions *options) {
+    if (!archivePath || !options) return;
+    SZProgressWindowController *pc = [SZProgressWindowController new];
+    [pc beginCompressToArchive:archivePath options:options completion:nil];
+  }];
 }
 
 // 仅在已打开归档时启用菜单项

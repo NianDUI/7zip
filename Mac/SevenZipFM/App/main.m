@@ -23,6 +23,8 @@ int main(int argc, const char **argv) {
     NSMenuItem *fileItem = [NSMenuItem new];
     [mainMenu addItem:fileItem];
     NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"文件"];
+    [fileMenu addItemWithTitle:@"新建归档…" action:@selector(newArchive:) keyEquivalent:@"n"];
+    [fileMenu addItem:[NSMenuItem separatorItem]];
     [fileMenu addItemWithTitle:@"解压到…" action:@selector(extractTo:) keyEquivalent:@"e"];
     [fileMenu addItemWithTitle:@"测试" action:@selector(testArchive:) keyEquivalent:@"t"];
     fileItem.submenu = fileMenu;
