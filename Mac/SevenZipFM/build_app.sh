@@ -16,7 +16,7 @@ cd "$CPP"
 [ -d "$ALONE" ] || { echo "缺 Alone2 对象集：cd CPP/7zip/Bundles/Alone2 && make -f ../../cmpl_mac_arm64.mak -j8"; exit 1; }
 
 CXXFLAGS=(-arch arm64 -O2 -DNDEBUG -D_REENTRANT -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -fPIC -std=c++11 -I . -include "$SHIM")
-OBJC=(-arch arm64 -O2 -fobjc-arc -I "$KIT/include" -I "$KIT/src" -I "$FM/Panel" -I "$FM/App" -I "$FM/Progress" -I "$FM/Dialogs" -I "$FM/Util")
+OBJC=(-arch arm64 -O2 -fobjc-arc -I "$KIT/include" -I "$KIT/src" -I "$FM/Panel" -I "$FM/App" -I "$FM/Progress" -I "$FM/Dialogs" -I "$FM/Util" -I "$FM/Shell")
 
 echo "==[1] Agent 闭环 + SevenZipKit C++ 核心 =="
 for f in Agent AgentProxy ArchiveFolder ArchiveFolderOpen UpdateCallbackAgent AgentOut ArchiveFolderOut; do
@@ -45,6 +45,8 @@ clang "${OBJC[@]}" -c "$FM/Progress/SZProgressWindowController.m" -o "$OUT/SZPro
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZExtractDialogController.m"   -o "$OUT/SZExtractDialogController.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZCompressDialogController.m"  -o "$OUT/SZCompressDialogController.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZHashResultController.m"     -o "$OUT/SZHashResultController.o"
+clang "${OBJC[@]}" -c "$FM/Shell/SZShellCommand.m"              -o "$OUT/SZShellCommand.o"
+clang "${OBJC[@]}" -c "$FM/Finder/SZFinderSync.m"              -o "$OUT/SZFinderSync.o"
 clang "${OBJC[@]}" -c "$FM/Util/SZQuarantine.m"                  -o "$OUT/SZQuarantine.o"
 clang "${OBJC[@]}" -c "$FM/App/SZAppDelegate.m"                  -o "$OUT/SZAppDelegate.o"
 clang "${OBJC[@]}" -c "$FM/App/main.m"                           -o "$OUT/main.o"
@@ -61,7 +63,7 @@ for o in "$ALONE"/*.o; do
 done
 clang++ -arch arm64 \
   "$OUT/main.o" "$OUT/SZAppDelegate.o" "$OUT/SZPanelController.o" "$OUT/SZProgressWindowController.o" \
-  "$OUT/SZExtractDialogController.o" "$OUT/SZCompressDialogController.o" "$OUT/SZHashResultController.o" "$OUT/SZQuarantine.o" \
+  "$OUT/SZExtractDialogController.o" "$OUT/SZCompressDialogController.o" "$OUT/SZHashResultController.o" "$OUT/SZShellCommand.o" "$OUT/SZQuarantine.o" \
   "$OUT/SZPanelModel.o" "$OUT/SZFSDataSource.o" "$OUT/SZFolderItem.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/SZArchiveExtractor.o" "$OUT/SZExtractCore.o" \
   "$OUT/SZArchiveCompressor.o" "$OUT/SZCompressCore.o" \
@@ -75,14 +77,26 @@ clang++ -arch arm64 \
   -o "$OUT/SevenZipFM.bin"
 echo "  ✓"
 
-echo "==[4] 组装 .app bundle =="
+echo "==[4] 组装 .app bundle + 嵌入 FinderSync 扩展 =="
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$FM/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$OUT/SevenZipFM.bin" "$APP/Contents/MacOS/SevenZipFM"
 chmod +x "$APP/Contents/MacOS/SevenZipFM"
-codesign --force --sign - "$APP" 2>/dev/null || echo "  (ad-hoc 签名跳过)"
-echo "  ✓ $APP"
+
+# FinderSync 扩展（.appex 嵌入 Contents/PlugIns/）。入口 _NSExtensionMain（Foundation 提供，PlugInKit 加载 principal class）。
+EXT="$APP/Contents/PlugIns/SevenZipFinder.appex"
+mkdir -p "$EXT/Contents/MacOS"
+cp "$FM/Finder/Ext-Info.plist" "$EXT/Contents/Info.plist"
+clang -arch arm64 -e _NSExtensionMain \
+  "$OUT/SZFinderSync.o" "$OUT/SZShellCommand.o" \
+  -framework Cocoa -framework FinderSync -framework Foundation \
+  -o "$EXT/Contents/MacOS/SevenZipFinder"
+chmod +x "$EXT/Contents/MacOS/SevenZipFinder"
+# 嵌套签名（从内到外）：先扩展（带沙箱 entitlements），再主 app
+codesign --force --sign - --entitlements "$FM/Finder/Ext.entitlements" "$EXT" 2>/dev/null || echo "  (扩展 ad-hoc 签名跳过)"
+codesign --force --sign - "$APP" 2>/dev/null || echo "  (app ad-hoc 签名跳过)"
+echo "  ✓ ${APP}（含 PlugIns/SevenZipFinder.appex）"
 
 echo "==[5] 生成样本归档（/tmp 清理后随构建重建，供桌面验证）=="
 SAMPLE="$OUT/sample.7z"

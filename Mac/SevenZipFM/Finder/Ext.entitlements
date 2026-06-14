@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- FinderSync 扩展强制沙箱 -->
+  <key>com.apple.security.app-sandbox</key> <true/>
+  <!-- 读取右键选中项路径（仅取路径生成菜单，不读内容；执行交主 app） -->
+  <key>com.apple.security.files.user-selected.read-only</key> <true/>
+</dict>
+</plist>

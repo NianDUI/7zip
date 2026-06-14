@@ -12,5 +12,13 @@
   <key>LSMinimumSystemVersion</key> <string>13.0</string>
   <key>NSHighResolutionCapable</key> <true/>
   <key>NSPrincipalClass</key>       <string>NSApplication</string>
+  <!-- sevenzip:// URL scheme：供 FinderSync 扩展唤起主 app 执行右键命令（M5-T2） -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>    <string>com.niandui.SevenZipFM.command</string>
+      <key>CFBundleURLSchemes</key> <array><string>sevenzip</string></array>
+    </dict>
+  </array>
 </dict>
 </plist>

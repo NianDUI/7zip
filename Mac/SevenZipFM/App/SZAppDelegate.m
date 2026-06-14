@@ -6,6 +6,7 @@
 #import "SZExtractDialogController.h"
 #import "SZCompressDialogController.h"
 #import "SZHashResultController.h"
+#import "SZShellCommand.h"
 #import "SevenZipKit/SZPanelModel.h"
 #import "SevenZipKit/SZFSDataSource.h"
 #import "SevenZipKit/SZFolderSession.h"
@@ -397,6 +398,122 @@
 
 - (void)copyToOther:(id)sender { [self.activePanel transferSelectionToPanel:self.otherPanel move:NO parent:_window]; [self refreshChrome]; }
 - (void)moveToOther:(id)sender { [self.activePanel transferSelectionToPanel:self.otherPanel move:YES parent:_window]; [self refreshChrome]; }
+
+#pragma mark - sevenzip:// URL 命令（FinderSync 扩展唤起，M5-T2）
+
+// Finder 扩展经 NSWorkspace openURL 发来命令。解码 SZShellCommand 后分发到现有 解压/压缩/测试/哈希 流程。
+- (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls {
+  for (NSURL *u in urls) {
+    SZShellCommand *cmd = [SZShellCommand commandFromURL:u];
+    if (cmd) [self executeShellCommand:cmd];
+    else NSBeep();
+  }
+}
+
+- (void)executeShellCommand:(SZShellCommand *)cmd {
+  [NSApp activateIgnoringOtherApps:YES];
+  [_window makeKeyAndOrderFront:nil];
+  NSArray<NSString *> *paths = cmd.paths;
+  if (paths.count == 0) { NSBeep(); return; }
+  NSString *first = paths.firstObject;
+
+  switch (cmd.op) {
+    case SZShellOpOpen:
+      [self openArchiveURL:[NSURL fileURLWithPath:first]];
+      break;
+    case SZShellOpExtract:        [self shellExtract:first dialog:YES toFolder:NO]; break;
+    case SZShellOpExtractHere:    [self shellExtract:first dialog:NO  toFolder:NO]; break;
+    case SZShellOpExtractToFolder:[self shellExtract:first dialog:NO  toFolder:YES]; break;
+    case SZShellOpTest: {
+      SZProgressWindowController *pc = [SZProgressWindowController new];
+      [pc beginTestArchive:first password:nil completion:nil];
+      break;
+    }
+    case SZShellOpCompress:    [self shellCompress:paths format:nil    dialog:YES]; break;
+    case SZShellOpCompress7z:  [self shellCompress:paths format:@"7z"  dialog:NO];  break;
+    case SZShellOpCompressZip: [self shellCompress:paths format:@"zip" dialog:NO];  break;
+    case SZShellOpHash: {
+      NSArray<NSString *> *methods = cmd.methods.count ? cmd.methods : @[@"CRC32", @"SHA256"];
+      [SZHashResultController presentForPaths:paths methods:methods parentWindow:_window];
+      break;
+    }
+    default: NSBeep();
+  }
+}
+
+- (void)shellExtract:(NSString *)archive dialog:(BOOL)dialog toFolder:(BOOL)toFolder {
+  if (![NSFileManager.defaultManager fileExistsAtPath:archive]) { NSBeep(); return; }
+  NSString *parent = archive.stringByDeletingLastPathComponent;
+  if (dialog) {
+    [SZExtractDialogController presentForArchive:archive.lastPathComponent defaultDestination:parent parentWindow:_window
+                                      completion:^(SZArchiveExtractOptions *options) {
+      if (!options) return;
+      SZProgressWindowController *pc = [SZProgressWindowController new];
+      [pc beginExtractArchive:archive options:options completion:nil];
+    }];
+    return;
+  }
+  NSString *dest = parent;
+  if (toFolder) dest = [self uniqueDirInParent:parent base:[SZShellCommand baseNameForArchive:archive]];
+  SZArchiveExtractOptions *o = [SZArchiveExtractOptions new];
+  o.outputDirectory = dest;
+  o.pathMode = SZExtractPathModeFull;
+  o.overwriteMode = toFolder ? SZExtractOverwriteModeOverwrite : SZExtractOverwriteModeAsk;
+  SZProgressWindowController *pc = [SZProgressWindowController new];
+  [pc beginExtractArchive:archive options:o completion:nil];
+}
+
+- (void)shellCompress:(NSArray<NSString *> *)inputs format:(NSString *)format dialog:(BOOL)dialog {
+  if (inputs.count == 0) { NSBeep(); return; }
+  NSString *parent = [inputs.firstObject stringByDeletingLastPathComponent];
+  NSString *base = [SZShellCommand archiveBaseNameForPaths:inputs];
+  NSString *ext = format ?: @"7z";
+  NSString *defArc = [parent stringByAppendingPathComponent:[base stringByAppendingPathExtension:ext]];
+  if (dialog) {
+    [SZCompressDialogController presentForInputs:inputs defaultArchivePath:defArc parentWindow:_window
+                                      completion:^(NSString *archivePath, SZCompressOptions *options) {
+      if (!archivePath || !options) return;
+      SZProgressWindowController *pc = [SZProgressWindowController new];
+      [pc beginCompressToArchive:archivePath options:options completion:nil];
+    }];
+    return;
+  }
+  // 快速压缩：默认选项，不弹对话框；目标不覆盖（名 1/名 2…）。
+  SZCompressOptions *o = [SZCompressOptions new];
+  o.format = ext;
+  o.inputPaths = inputs;
+  o.level = 5;
+  o.solid = [ext isEqualToString:@"7z"];
+  o.storeMTime = YES;
+  SZProgressWindowController *pc = [SZProgressWindowController new];
+  [pc beginCompressToArchive:[self uniqueArchivePath:defArc] options:o completion:nil];
+}
+
+// 不覆盖的目标目录名（名/名 1/名 2…）
+- (NSString *)uniqueDirInParent:(NSString *)parent base:(NSString *)base {
+  NSFileManager *fm = NSFileManager.defaultManager;
+  NSString *cand = [parent stringByAppendingPathComponent:base];
+  if (![fm fileExistsAtPath:cand]) return cand;
+  for (int i = 1; i < 1000; i++) {
+    cand = [parent stringByAppendingPathComponent:[NSString stringWithFormat:@"%@ %d", base, i]];
+    if (![fm fileExistsAtPath:cand]) return cand;
+  }
+  return cand;
+}
+
+// 不覆盖的归档文件名（名.7z/名 1.7z…）
+- (NSString *)uniqueArchivePath:(NSString *)path {
+  NSFileManager *fm = NSFileManager.defaultManager;
+  if (![fm fileExistsAtPath:path]) return path;
+  NSString *dir = path.stringByDeletingLastPathComponent;
+  NSString *base = path.lastPathComponent.stringByDeletingPathExtension;
+  NSString *ext = path.pathExtension;
+  for (int i = 1; i < 1000; i++) {
+    NSString *cand = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@ %d.%@", base, i, ext]];
+    if (![fm fileExistsAtPath:cand]) return cand;
+  }
+  return path;
+}
 
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
   if (item.action == @selector(extractTo:) || item.action == @selector(testArchive:))

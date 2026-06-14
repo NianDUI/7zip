@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>   <string>zh_CN</string>
+  <key>CFBundleDisplayName</key>         <string>7-Zip</string>
+  <key>CFBundleName</key>                <string>7-Zip Finder</string>
+  <key>CFBundleExecutable</key>          <string>SevenZipFinder</string>
+  <key>CFBundleIdentifier</key>          <string>com.niandui.SevenZipFM.FinderExt</string>
+  <key>CFBundleVersion</key>             <string>0.1</string>
+  <key>CFBundleShortVersionString</key>  <string>0.1</string>
+  <key>CFBundlePackageType</key>         <string>XPC!</string>
+  <key>LSMinimumSystemVersion</key>      <string>13.0</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key>  <string>com.apple.FinderSync</string>
+    <key>NSExtensionPrincipalClass</key>   <string>SZFinderSync</string>
+  </dict>
+</dict>
+</plist>
