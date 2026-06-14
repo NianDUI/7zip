@@ -1,8 +1,9 @@
-// SZPanelController.h —— 单面板控制器：驱动 NSTableView（view-based 虚拟模式）显示 SZPanelModel。
-// 承载列/排序/选择/导航的 UI 绑定。核心格式化与导航逻辑（stringForColumn:/双击/Backspace/排序）
-// 不依赖真实 NSTableView 渲染，可 headless 单测。对应 05-roadmap §2 M1-T7。
+// SZPanelController.h —— 单面板控制器：驱动 NSTableView（view-based 虚拟模式）显示一个 id<SZPanelSource>。
+// 面向统一数据源协议工作（M4-T1）：真实文件系统（SZFSDataSource）与归档内部（SZPanelModel）共用同一面板交互。
+// 列/排序/选择/导航 UI 绑定；拖出/打开/解压按 source.representsArchive 分流。对应 05-roadmap M1-T7 / M4-T1。
 #import <AppKit/AppKit.h>
 #import "SevenZipKit/SZPanelModel.h"
+#import "SevenZipKit/SZPanelSource.h"
 NS_ASSUME_NONNULL_BEGIN
 
 // 列标识（与 NSTableColumn.identifier 一致）
@@ -10,13 +11,21 @@ extern NSString *const SZColID_Name;
 extern NSString *const SZColID_Size;
 extern NSString *const SZColID_Modified;
 
-@interface SZPanelController : NSObject <NSTableViewDataSource, NSTableViewDelegate, NSFilePromiseProviderDelegate>
+@interface SZPanelController : NSObject <NSTableViewDataSource, NSTableViewDelegate, NSFilePromiseProviderDelegate, NSMenuDelegate>
 
-- (instancetype)initWithModel:(SZPanelModel *)model;
-@property (nonatomic, readonly) SZPanelModel *model;
+/// 以 FS 数据源初始化（栈底）。归档通过 pushArchiveAtFSPath: 进入。
+- (instancetype)initWithSource:(id<SZPanelSource>)source;
+@property (nonatomic, readonly) id<SZPanelSource> source;
 
-/// 当前归档 FS 路径——Finder 拖出（file promise 延迟解压）的解压源；nil 则禁用拖出。
-@property (nonatomic, copy, nullable) NSString *archivePath;
+/// 当前栈顶若为归档则其磁盘路径，否则 nil——Finder 拖出（file promise 延迟解压）的解压源。
+@property (nonatomic, readonly, nullable) NSString *archivePath;
+/// 栈顶是否归档（调用方据此决定标题 / 自动刷新策略）。
+@property (nonatomic, readonly) BOOL inArchive;
+
+/// 进入 FS 上的归档文件（内部 push 归档数据源到栈顶）。成功返回 YES。
+- (BOOL)pushArchiveAtFSPath:(NSString *)fsPath;
+/// 当前可解压/测试的目标归档：栈顶归档→其路径；FS→选中的归档文件。供工具栏「解压/测试」。
+- (nullable NSString *)currentArchiveFSPath;
 
 /// 绑定一个 NSTableView（设 dataSource/delegate、建列、装双击/排序回调）。可为 nil 走纯逻辑（headless）。
 - (void)bindTableView:(nullable NSTableView *)tableView;
@@ -33,6 +42,8 @@ extern NSString *const SZColID_Modified;
 - (BOOL)activateRow:(NSInteger)row;
 /// Backspace：上溯父目录，成功返回 YES。
 - (BOOL)goToParent;
+/// 刷新当前层（重读数据源 + 重画表 + 按项标识恢复选择）。
+- (void)refresh;
 /// 点击列头排序（columnID→SZSortColumn，同列切向/新列默认向，逻辑在 SZPanelModel）。
 - (void)sortByColumnID:(NSString *)columnID;
 

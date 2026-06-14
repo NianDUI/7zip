@@ -34,6 +34,8 @@ echo "  ✓"
 echo "==[2] SevenZipKit ObjC + SevenZipFM（AppKit）=="
 clang "${OBJC[@]}" -x objective-c++ -c "$KIT/src/SZFolderSession.mm"   -o "$OUT/SZFolderSession.o"
 clang "${OBJC[@]}" -x objective-c++ -c "$KIT/src/SZPanelModel.mm"      -o "$OUT/SZPanelModel.o"
+clang "${OBJC[@]}" -c "$KIT/src/SZFolderItem.m"                        -o "$OUT/SZFolderItem.o"
+clang "${OBJC[@]}" -c "$KIT/src/SZFSDataSource.m"                      -o "$OUT/SZFSDataSource.o"
 clang "${OBJC[@]}" -std=c++11 -x objective-c++ -c "$KIT/src/SZArchiveExtractor.mm" -o "$OUT/SZArchiveExtractor.o"
 clang "${OBJC[@]}" -std=c++11 -x objective-c++ -c "$KIT/src/SZArchiveCompressor.mm" -o "$OUT/SZArchiveCompressor.o"
 clang "${OBJC[@]}" -c "$FM/Panel/SZPanelController.m"            -o "$OUT/SZPanelController.o"
@@ -57,7 +59,7 @@ done
 clang++ -arch arm64 \
   "$OUT/main.o" "$OUT/SZAppDelegate.o" "$OUT/SZPanelController.o" "$OUT/SZProgressWindowController.o" \
   "$OUT/SZExtractDialogController.o" "$OUT/SZCompressDialogController.o" "$OUT/SZQuarantine.o" \
-  "$OUT/SZPanelModel.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
+  "$OUT/SZPanelModel.o" "$OUT/SZFSDataSource.o" "$OUT/SZFolderItem.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/SZArchiveExtractor.o" "$OUT/SZExtractCore.o" \
   "$OUT/SZArchiveCompressor.o" "$OUT/SZCompressCore.o" \
   "$OUT/Agent.o" "$OUT/AgentProxy.o" "$OUT/ArchiveFolder.o" "$OUT/ArchiveFolderOpen.o" \

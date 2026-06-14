@@ -43,6 +43,9 @@
 
 - (NSArray<SZFolderItem *> *)items { return _session.items; }
 - (NSString *)currentPath { return _session.currentPath; }
+- (BOOL)representsArchive { return YES; }
+- (NSString *)fileSystemPathForIndex:(NSUInteger)index { return nil; }   // 归档项无磁盘实体（拖出走延迟解压）
+- (void)refresh { }   // 归档内容不随外部变化；刷新由控制器 reloadData 重画即可
 - (NSArray<SZColumn *> *)columns { return _columns; }
 - (SZSortColumn)sortColumn { return _session.sortColumn; }
 - (BOOL)sortAscending { return _session.sortAscending; }

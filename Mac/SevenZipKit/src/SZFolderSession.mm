@@ -4,6 +4,7 @@
 
 #import "SevenZipKit/SZFolderSession.h"
 #import "SevenZipKit/SZError.h"
+#import "SZFolderItem_Private.h"   // SZFolderItem readwrite 私有接口
 #include "SZFolderCore.h"     // 纯 C++，无 7-Zip 头
 
 NSErrorDomain const SZErrorDomain = @"com.7zip.SevenZipKit";
@@ -12,21 +13,9 @@ static NSString *SZStr(const std::string &s) {
   return [[NSString alloc] initWithBytes:s.data() length:s.size() encoding:NSUTF8StringEncoding] ?: @"";
 }
 
-#pragma mark - SZFolderItem（私有 readwrite）
+#pragma mark - SZFolderItem 填充（归档项；磁盘项走 SZFolderItem.m 的 itemWithName:）
 
-@interface SZFolderItem ()
-@property (nonatomic) NSUInteger index;
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *path;
-@property (nonatomic) BOOL isDirectory;
-@property (nonatomic) uint64_t size;
-@property (nonatomic, nullable) NSDate *modificationDate;
-@property (nonatomic) uint32_t attributes;
-@property (nonatomic, nullable) NSNumber *crc;
-@end
-
-@implementation SZFolderItem
-+ (instancetype)itemFromCore:(const SZCoreItem &)c index:(NSUInteger)i {
+static SZFolderItem *SZItemFromCore(const SZCoreItem &c, NSUInteger i) {
   SZFolderItem *it = [SZFolderItem new];
   it.index = i;
   it.path = SZStr(c.path);
@@ -38,7 +27,6 @@ static NSString *SZStr(const std::string &s) {
   it.crc = c.hasCrc ? @(c.crc) : nil;
   return it;
 }
-@end
 
 #pragma mark - SZFolderSession
 
@@ -88,7 +76,7 @@ static SZSortKey SZKeyFromColumn(SZSortColumn c) {
 - (NSArray<SZFolderItem *> *)items {
   const std::vector<SZCoreItem> &v = _core.items();
   NSMutableArray *arr = [NSMutableArray arrayWithCapacity:v.size()];
-  for (size_t i = 0; i < v.size(); i++) [arr addObject:[SZFolderItem itemFromCore:v[i] index:i]];
+  for (size_t i = 0; i < v.size(); i++) [arr addObject:SZItemFromCore(v[i], i)];
   return arr;
 }
 

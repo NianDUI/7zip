@@ -15,6 +15,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) uint32_t attributes;             // kpidAttrib（高 16 位含 UNIX st_mode）
 @property (nonatomic, readonly, nullable) NSNumber *crc;          // kpidCRC（可能缺失→nil）
 
+/// 供文件系统数据源（SZFSDataSource）构造磁盘项；归档项内部走 itemFromCore:。
++ (instancetype)itemWithName:(NSString *)name
+                        path:(NSString *)path
+                 isDirectory:(BOOL)isDirectory
+                        size:(uint64_t)size
+            modificationDate:(nullable NSDate *)modificationDate
+                  attributes:(uint32_t)attributes;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -4,6 +4,7 @@
 #import <Foundation/Foundation.h>
 #import "SZFolderItem.h"
 #import "SZFolderSession.h"
+#import "SZPanelSource.h"
 NS_ASSUME_NONNULL_BEGIN
 
 /// 一列定义（标题 / 对应排序列 / 显隐 / 宽度）。列持久化（结构化 plist）见 M4-T4。
@@ -14,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) double width;
 @end
 
-@interface SZPanelModel : NSObject
+@interface SZPanelModel : NSObject <SZPanelSource>
 
 + (nullable instancetype)panelWithFileURL:(NSURL *)url error:(NSError * _Nullable * _Nullable)error;
 

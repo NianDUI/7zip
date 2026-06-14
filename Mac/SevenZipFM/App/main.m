@@ -23,6 +23,7 @@ int main(int argc, const char **argv) {
     NSMenuItem *fileItem = [NSMenuItem new];
     [mainMenu addItem:fileItem];
     NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"文件"];
+    [fileMenu addItemWithTitle:@"打开…" action:@selector(openLocation:) keyEquivalent:@"o"];
     [fileMenu addItemWithTitle:@"新建归档…" action:@selector(newArchive:) keyEquivalent:@"n"];
     [fileMenu addItem:[NSMenuItem separatorItem]];
     [fileMenu addItemWithTitle:@"解压到…" action:@selector(extractTo:) keyEquivalent:@"e"];
@@ -43,6 +44,13 @@ int main(int argc, const char **argv) {
     [editMenu addItemWithTitle:@"粘贴" action:@selector(paste:) keyEquivalent:@"v"];
     [editMenu addItemWithTitle:@"全选" action:@selector(selectAll:) keyEquivalent:@"a"];
     editItem.submenu = editMenu;
+
+    // 显示菜单（刷新）——完整视图菜单留 M4-T3
+    NSMenuItem *viewItem = [NSMenuItem new];
+    [mainMenu addItem:viewItem];
+    NSMenu *viewMenu = [[NSMenu alloc] initWithTitle:@"显示"];
+    [viewMenu addItemWithTitle:@"刷新" action:@selector(refresh:) keyEquivalent:@"r"];
+    viewItem.submenu = viewMenu;
 
     app.mainMenu = mainMenu;
 
