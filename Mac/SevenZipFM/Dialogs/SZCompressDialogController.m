@@ -154,6 +154,10 @@ static NSMutableSet *g_alive;
     [btnRow.widthAnchor constraintEqualToAnchor:col.widthAnchor constant:-36],
   ]];
   [self onFormatChange:nil];
+
+  // 让窗口高度贴合内容，避免中部大片空白（col 四边钉死时若窗口偏高会被拉开）。
+  [_window.contentView layoutSubtreeIfNeeded];
+  [_window setContentSize:NSMakeSize(560, col.fittingSize.height)];
 }
 
 #pragma mark - 动作
