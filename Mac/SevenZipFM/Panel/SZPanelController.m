@@ -23,12 +23,19 @@ NSString *const SZColID_Modified = @"modified";
   NSDateFormatter *_dateFmt;
   NSOperationQueue *_promiseQueue;   // file promise 后台解压队列（绝不用 mainQueue）
   SZArchiveExtractor *_openExtractor; // 右键「打开」的临时解压器（保活至完成）
+  NSMutableArray<NSString *> *_layerTemp;   // 与 _stack 平行：嵌套归档层的临时解压目录（pop/dealloc 清），非嵌套层 @""
+}
+
+- (void)dealloc {
+  for (NSString *t in _layerTemp)
+    if (t.length) [NSFileManager.defaultManager removeItemAtPath:t error:nil];
 }
 
 - (instancetype)initWithSource:(id<SZPanelSource>)source {
   if ((self = [super init])) {
     _stack = [NSMutableArray arrayWithObject:source];
     _archivePaths = [NSMutableArray arrayWithObject:@""];   // 栈底 FS 占位
+    _layerTemp = [NSMutableArray arrayWithObject:@""];      // 栈底无临时目录
     _source = source;
     _sizeFmt = [NSByteCountFormatter new];
     _sizeFmt.countStyle = NSByteCountFormatterCountStyleFile;
@@ -53,9 +60,42 @@ NSString *const SZColID_Modified = @"modified";
   }
   [_stack addObject:m];
   [_archivePaths addObject:fsPath];
+  [_layerTemp addObject:@""];   // 默认非嵌套（嵌套打开成功后由 markLastLayerTempDir 改写）
   _source = m;
   [self reload];
   return YES;
+}
+
+// 嵌套归档（归档内的归档，如 .tar.gz 里的 .tar）：解压该项到临时目录，再 push 临时归档为新层。
+// 异步（解压走进度窗），故 activateRow 对其返回 NO，完成后这里自行 reload。临时目录在 pop/dealloc 清理。
+- (void)enterNestedArchiveAtRow:(NSInteger)row {
+  NSString *arc = self.archivePath;
+  if (!arc || row < 0 || row >= (NSInteger)_source.items.count) { NSBeep(); return; }
+  NSString *innerPath = [self fullArchivePathForRow:row];     // 档内完整路径
+  NSString *innerName = _source.items[(NSUInteger)row].name;  // 文件名
+  NSString *tmpDir = [NSTemporaryDirectory() stringByAppendingPathComponent:
+      [@"sz_nested_" stringByAppendingString:NSUUID.UUID.UUIDString]];
+  [NSFileManager.defaultManager createDirectoryAtPath:tmpDir withIntermediateDirectories:YES attributes:nil error:nil];
+
+  SZArchiveExtractOptions *o = [SZArchiveExtractOptions new];
+  o.outputDirectory = tmpDir;
+  o.pathMode = SZExtractPathModeNone;            // 铺平：目标项直接落到 tmpDir 根
+  o.overwriteMode = SZExtractOverwriteModeOverwrite;
+  o.selectedPaths = @[innerPath];
+
+  __weak typeof(self) ws = self;
+  SZProgressWindowController *pc = [SZProgressWindowController new];
+  [pc beginExtractArchive:arc options:o completion:^(BOOL ok) {
+    NSString *extracted = [tmpDir stringByAppendingPathComponent:innerName];
+    if (ok && [NSFileManager.defaultManager fileExistsAtPath:extracted]) {
+      if ([ws pushArchiveAtFSPath:extracted]) { [ws markLastLayerTempDir:tmpDir]; return; }
+    }
+    [NSFileManager.defaultManager removeItemAtPath:tmpDir error:nil];   // 失败/取消 → 清临时
+  }];
+}
+
+- (void)markLastLayerTempDir:(NSString *)dir {
+  if (_layerTemp.count) _layerTemp[_layerTemp.count - 1] = dir ?: @"";
 }
 
 // 扩展名是否引擎支持的归档（FS 下双击归档 / 右键解压判定）。
@@ -101,8 +141,12 @@ NSString *const SZColID_Modified = @"modified";
     if ([_source enterFolderAtIndex:(NSUInteger)row error:&err]) { [self reload]; return YES; }
     return NO;
   }
-  // 文件：仅 FS 数据源在面板内处理（归档内文件双击留待右键「打开」解压临时）。
-  if (_source.representsArchive) return NO;
+  // 归档内的归档项（如 .tar.gz 里的 .tar）→ 解压临时后进入嵌套层（异步，返回 NO）。
+  // 其它归档内文件双击不处理（留右键「打开」）。
+  if (_source.representsArchive) {
+    if ([self isArchiveFile:it.name]) [self enterNestedArchiveAtRow:row];
+    return NO;
+  }
   NSString *fsPath = [_source fileSystemPathForIndex:(NSUInteger)row];
   if (!fsPath) return NO;
   if ([self isArchiveFile:fsPath]) return [self pushArchiveAtFSPath:fsPath];   // 进入归档（push 栈）
@@ -117,6 +161,9 @@ NSString *const SZColID_Modified = @"modified";
   if (_stack.count > 1) {
     [_stack removeLastObject];
     [_archivePaths removeLastObject];
+    NSString *temp = _layerTemp.lastObject;
+    [_layerTemp removeLastObject];
+    if (temp.length) [NSFileManager.defaultManager removeItemAtPath:temp error:nil];   // 清嵌套临时
     _source = _stack.lastObject;
     [self reload];
     return YES;
