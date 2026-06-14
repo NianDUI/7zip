@@ -17,6 +17,7 @@ struct SZCoreItem {
   uint32_t    attrib = 0;   // kpidAttrib
   bool        hasCrc = false;
   uint32_t    crc    = 0;
+  uint32_t    folderIndex = 0;  // 当前 folder 内原始序号（删除/重命名用；不随排序改变所指条目）
 };
 
 /// 排序键（对齐 7zFM 列）。默认方向：Size/MTime 降序、其余升序（PanelSort.cpp:264-272）。
@@ -52,6 +53,14 @@ public:
 
   uint32_t archiveErrorFlags();            // kpidErrorFlags（第 0 层）
   uint64_t archivePhysicalSize();          // kpidPhySize
+
+  // —— 写操作（M3-T5 归档内增删改）：调 CAgentFolder IFolderOperations + CommonUpdateOperation 重写归档。
+  //    返回 0=成功；-1=格式不支持更新；其它=HRESULT。成功后自动 reload 当前层 items。——
+  bool canUpdate();                                        // 当前归档格式是否支持更新
+  int deleteItems(const std::vector<size_t> &coreIndices); // 删除条目（核心索引）
+  int createFolder(const std::string &name);               // 在当前层新建文件夹
+  int renameItem(size_t coreIndex, const std::string &newName);
+  int addFile(const std::string &fsPath);                  // 添加外部文件到当前层
 
 private:
   struct Impl;

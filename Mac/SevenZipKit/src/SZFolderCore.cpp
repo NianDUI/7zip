@@ -49,6 +49,10 @@ unsigned long long PropU64(const PROPVARIANT &p) {
   }
 }
 
+UString ToUString(const std::string &s) {
+  return MultiByteToUnicodeString(AString(s.c_str()), CP_UTF8);
+}
+
 } // namespace
 
 struct SZFolderCore::Impl {
@@ -146,6 +150,7 @@ struct SZFolderCore::Impl {
       it.mtime  = (mtime.vt == VT_FILETIME) ? FiletimeToUnix(mtime.filetime) : -1;
       it.hasCrc = (crc.vt == VT_UI4);
       it.crc    = (crc.vt == VT_UI4) ? crc.ulVal : 0;
+      it.folderIndex = i;
       items.push_back(std::move(it));
     }
     applySort();   // 保持当前排序（导航后亦然）
@@ -240,3 +245,91 @@ bool SZFolderCore::sortAscending() const { return _p->ascending_; }
 
 uint32_t SZFolderCore::archiveErrorFlags()   { return (uint32_t)_p->arcProp(kpidErrorFlags); }
 uint64_t SZFolderCore::archivePhysicalSize() { return _p->arcProp(kpidPhySize); }
+
+// ======================== 写操作（M3-T5 归档内增删改）========================
+
+namespace {
+// 最小更新进度回调（COM 堆分配；写操作同步完成，本桥接暂不透传进度/密码）。
+class SZUpdateProgress Z7_final:
+  public IFolderArchiveUpdateCallback,
+  public CMyUnknownImp
+{
+  Z7_COM_QI_BEGIN2(IFolderArchiveUpdateCallback)
+  Z7_COM_QI_END
+  Z7_COM_ADDREF_RELEASE
+  Z7_IFACE_COM7_IMP(IProgress)
+  Z7_IFACE_COM7_IMP(IFolderArchiveUpdateCallback)
+};
+Z7_COM7F_IMF(SZUpdateProgress::SetTotal(UInt64)) { return S_OK; }
+Z7_COM7F_IMF(SZUpdateProgress::SetCompleted(const UInt64 *)) { return S_OK; }
+Z7_COM7F_IMF(SZUpdateProgress::CompressOperation(const wchar_t *)) { return S_OK; }
+Z7_COM7F_IMF(SZUpdateProgress::DeleteOperation(const wchar_t *)) { return S_OK; }
+Z7_COM7F_IMF(SZUpdateProgress::OperationResult(Int32)) { return S_OK; }
+Z7_COM7F_IMF(SZUpdateProgress::UpdateErrorMessage(const wchar_t *)) { return S_OK; }
+Z7_COM7F_IMF(SZUpdateProgress::SetNumFiles(UInt64)) { return S_OK; }
+
+IFolderOperations *GetOps(IFolderFolder *folder) {
+  IFolderOperations *ops = NULL;
+  if (folder) folder->QueryInterface(IID_IFolderOperations, (void **)&ops);
+  return ops;
+}
+} // namespace
+
+bool SZFolderCore::canUpdate() {
+  CMyComPtr<IFolderOperations> ops = GetOps(_p->folder);
+  return ops != NULL;
+}
+
+int SZFolderCore::deleteItems(const std::vector<size_t> &coreIndices) {
+  CMyComPtr<IFolderOperations> ops = GetOps(_p->folder);
+  if (!ops) return -1;
+  CRecordVector<UInt32> idx;
+  for (size_t i = 0; i < coreIndices.size(); i++) {
+    const size_t ci = coreIndices[i];
+    if (ci < _p->items.size()) idx.Add(_p->items[ci].folderIndex);
+  }
+  if (idx.IsEmpty()) return 0;
+  CMyComPtr<IProgress> prog = new SZUpdateProgress();
+  const HRESULT hr = ops->Delete(&idx[0], idx.Size(), prog);
+  if (hr != S_OK) return (int)hr;
+  _p->reload();
+  return 0;
+}
+
+int SZFolderCore::createFolder(const std::string &name) {
+  CMyComPtr<IFolderOperations> ops = GetOps(_p->folder);
+  if (!ops) return -1;
+  CMyComPtr<IProgress> prog = new SZUpdateProgress();
+  const HRESULT hr = ops->CreateFolder(ToUString(name).Ptr(), prog);
+  if (hr != S_OK) return (int)hr;
+  _p->reload();
+  return 0;
+}
+
+int SZFolderCore::renameItem(size_t coreIndex, const std::string &newName) {
+  if (coreIndex >= _p->items.size()) return -1;
+  CMyComPtr<IFolderOperations> ops = GetOps(_p->folder);
+  if (!ops) return -1;
+  CMyComPtr<IProgress> prog = new SZUpdateProgress();
+  const HRESULT hr = ops->Rename(_p->items[coreIndex].folderIndex, ToUString(newName).Ptr(), prog);
+  if (hr != S_OK) return (int)hr;
+  _p->reload();
+  return 0;
+}
+
+int SZFolderCore::addFile(const std::string &fsPath) {
+  CMyComPtr<IFolderOperations> ops = GetOps(_p->folder);
+  if (!ops) return -1;
+  std::string dir, name;
+  const size_t slash = fsPath.find_last_of('/');
+  if (slash == std::string::npos) { dir = "."; name = fsPath; }
+  else { dir = fsPath.substr(0, slash); name = fsPath.substr(slash + 1); }
+  const UString dirU = ToUString(dir);
+  const UString nameU = ToUString(name);
+  const wchar_t *items[1] = { nameU.Ptr() };
+  CMyComPtr<IProgress> prog = new SZUpdateProgress();
+  const HRESULT hr = ops->CopyFrom(0, dirU.Ptr(), items, 1, prog);
+  if (hr != S_OK) return (int)hr;
+  _p->reload();
+  return 0;
+}

@@ -100,12 +100,11 @@ HRESULT SZUpdateCallback::GetPw(BSTR *password) {
   return StringToBstr(_password.Ptr(), password);
 }
 HRESULT SZUpdateCallback::CryptoGetTextPassword2(Int32 *passwordIsDefined, BSTR *password) {
+  // 引擎压缩任何格式都会调本回调查询"是否加密"。仅当请求预设了密码才加密；
+  // 否则 passwordIsDefined=0（不加密），绝不弹询问框（修：未勾加密却弹密码框）。
   *password = NULL;
-  if (!_passwordDefined && _del) {
-    std::string pw;
-    if (_del->getPassword(pw)) { _password = ToUString(pw); _passwordDefined = true; }
-  }
   *passwordIsDefined = _passwordDefined ? 1 : 0;
+  if (!_passwordDefined) return S_OK;
   return StringToBstr(_password.Ptr(), password);
 }
 HRESULT SZUpdateCallback::CryptoGetTextPassword(BSTR *password) { return GetPw(password); }
