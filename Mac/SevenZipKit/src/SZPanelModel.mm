@@ -48,6 +48,17 @@
 - (BOOL)sortAscending { return _session.sortAscending; }
 - (BOOL)canGoToParent { return _session.canGoToParent; }
 - (uint32_t)archiveErrorFlags { return _session.archiveErrorFlags; }
+- (BOOL)canUpdate { return _session.canUpdate; }
+
+- (BOOL)deleteItemsAtIndexes:(NSIndexSet *)indexes error:(NSError **)error {
+  if (![_session deleteItemsAtIndexes:indexes error:error]) return NO;
+  [_selectedPaths removeAllObjects];   // 删除后重置选择
+  return YES;
+}
+
+- (BOOL)renameItemAtIndex:(NSUInteger)index toName:(NSString *)newName error:(NSError **)error {
+  return [_session renameItemAtIndex:index toName:newName error:error];
+}
 
 #pragma mark 排序
 

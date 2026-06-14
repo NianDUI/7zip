@@ -119,4 +119,26 @@ static SZSortKey SZKeyFromColumn(SZSortColumn c) {
 - (uint32_t)archiveErrorFlags { return _core.archiveErrorFlags(); }
 - (uint64_t)archivePhysicalSize { return _core.archivePhysicalSize(); }
 
+#pragma mark 写操作（M3-T5）
+
+- (BOOL)canUpdate { return _core.canUpdate(); }
+
+- (BOOL)deleteItemsAtIndexes:(NSIndexSet *)indexes error:(NSError **)error {
+  __block std::vector<size_t> idx;
+  [indexes enumerateIndexesUsingBlock:^(NSUInteger i, BOOL *stop) { idx.push_back((size_t)i); }];
+  const int rc = _core.deleteItems(idx);
+  if (rc == 0) return YES;
+  if (error) *error = [NSError errorWithDomain:SZErrorDomain
+      code:(rc == -1 ? SZErrorUnknown : SZErrorHResult) userInfo:@{@"SZUnderlyingHRESULT": @(rc)}];
+  return NO;
+}
+
+- (BOOL)renameItemAtIndex:(NSUInteger)index toName:(NSString *)newName error:(NSError **)error {
+  const int rc = _core.renameItem((size_t)index, newName.UTF8String ? newName.UTF8String : "");
+  if (rc == 0) return YES;
+  if (error) *error = [NSError errorWithDomain:SZErrorDomain
+      code:(rc == -1 ? SZErrorUnknown : SZErrorHResult) userInfo:@{@"SZUnderlyingHRESULT": @(rc)}];
+  return NO;
+}
+
 @end

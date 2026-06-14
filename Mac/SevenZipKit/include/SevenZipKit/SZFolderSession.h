@@ -54,6 +54,14 @@ typedef NS_ENUM(NSInteger, SZSortColumn) {
 @property (nonatomic, readonly) uint32_t archiveErrorFlags;      // kpidErrorFlags（0=无错误）
 @property (nonatomic, readonly) uint64_t archivePhysicalSize;    // kpidPhySize
 
+#pragma mark 写操作（M3-T5 归档内增删改；调 CAgentFolder + 重写归档，成功后 items 自动刷新）
+/// 当前归档格式是否支持更新（只读格式如 rar 返回 NO）。
+@property (nonatomic, readonly) BOOL canUpdate;
+/// 删除当前层条目（indexes 相对当前 items 顺序）。
+- (BOOL)deleteItemsAtIndexes:(NSIndexSet *)indexes error:(NSError * _Nullable * _Nullable)error;
+/// 重命名当前层某条目。
+- (BOOL)renameItemAtIndex:(NSUInteger)index toName:(NSString *)newName error:(NSError * _Nullable * _Nullable)error;
+
 @end
 
 NS_ASSUME_NONNULL_END

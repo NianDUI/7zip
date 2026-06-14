@@ -49,6 +49,11 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark 归档级
 @property (nonatomic, readonly) uint32_t archiveErrorFlags;
 
+#pragma mark 写操作（M3-T5 归档内增删改）
+@property (nonatomic, readonly) BOOL canUpdate;
+- (BOOL)deleteItemsAtIndexes:(NSIndexSet *)indexes error:(NSError * _Nullable * _Nullable)error;
+- (BOOL)renameItemAtIndex:(NSUInteger)index toName:(NSString *)newName error:(NSError * _Nullable * _Nullable)error;
+
 @end
 
 NS_ASSUME_NONNULL_END
