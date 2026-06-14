@@ -128,7 +128,7 @@
 
   _activeSide = 0;
   [self setActiveSide:0];
-  [self setTwoPanels:YES];   // 默认双面板（激活右面板约束）
+  [self setTwoPanels:NO];   // 默认单面板（双面板经 ⌘\ 或工具栏「单/双」切换）
   [_window makeFirstResponder:_table[0]];
 
   [NSNotificationCenter.defaultCenter addObserver:self
