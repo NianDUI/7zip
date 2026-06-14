@@ -70,14 +70,112 @@ static SZCompressRequest MakeRequest(NSString *archivePath, SZCompressOptions *o
   req.encryptHeader = o.encryptHeader;
   if (o.password.length) { req.hasPassword = true; req.password = SZU(o.password); }
   for (NSString *p in o.inputPaths) req.inputPaths.push_back(SZU(p));
+  // 时间戳：仅下发偏离默认者（引擎默认 tm=on、tc/ta=off），降低对 tar 等格式触发不支持属性的概率。
+  if (!o.storeMTime) req.extraProperties.push_back("tm=off");
+  if (o.storeCTime)  req.extraProperties.push_back("tc=on");
+  if (o.storeATime)  req.extraProperties.push_back("ta=on");
+  if (o.timePrecision != SZTimePrecisionDefault) {  // tpN 后缀式（与命令行 -mtp 一致）
+    char buf[16]; snprintf(buf, sizeof buf, "tp%ld", (long)o.timePrecision);
+    req.extraProperties.push_back(buf);
+  }
   return req;
 }
+
+#pragma mark - 内存估算（移植 CompressDialog.cpp::GetMemoryUsage_Threads_Dict_DecompMem）
+
+namespace {
+enum SZMethodId { SZ_M_NONE, SZ_M_LZMA2, SZ_M_DEFLATE };
+
+// 等级→默认字典：与 C/LzmaEnc.c LzmaEncProps_Normalize 同式（64 位 size_t），
+// 故本估算的字典即引擎压缩时实际采用者（我们走 -mx=N、不显式 -md）。
+uint64_t SZLevelDict(int level) {
+  if (level <= 4) return (uint64_t)1 << (level * 2 + 16);
+  if (level <= 8) return (uint64_t)1 << (level + 20);
+  return (uint64_t)1 << 28;   // level 9
+}
+
+uint64_t SZLzma2ChunkSize(uint64_t dict) {   // = Get_Lzma2_ChunkSize()
+  uint64_t cs = dict << 2;
+  const uint32_t kMin = (uint32_t)1 << 20, kMax = (uint32_t)1 << 28;
+  if (cs < kMin) cs = kMin;
+  if (cs > kMax) cs = kMax;
+  if (cs < dict) cs = dict;
+  cs += (kMin - 1);
+  cs &= ~(uint64_t)(kMin - 1);
+  return cs;
+}
+
+SZMemoryEstimate SZEstimate(int method, int level, int numThreads) {
+  SZMemoryEstimate r = { (uint64_t)-1, (uint64_t)-1 };
+  if (numThreads < 1) numThreads = 1;
+
+  if (method == SZ_M_NONE || level == 0) {   // tar / 仅存储
+    r.compressBytes = (1 << 20); r.decompressBytes = (1 << 20);
+    return r;
+  }
+
+  if (method == SZ_M_LZMA2) {
+    uint64_t size = 0;
+    const uint64_t dict = SZLevelDict(level);
+    uint32_t hs = (uint32_t)dict - 1;
+    hs |= hs >> 1; hs |= hs >> 2; hs |= hs >> 4; hs |= hs >> 8;
+    hs >>= 1;
+    if (hs >= (1u << 24)) hs >>= 1;
+    hs |= (1u << 16) - 1;
+    if (level < 5) hs |= (256u << 10) - 1;
+    hs++;
+    uint64_t size1 = (uint64_t)hs * 4;
+    size1 += dict * 4;
+    if (level >= 5) size1 += dict * 4;
+    size1 += (2 << 20);
+
+    uint32_t numThreads1 = 1;
+    if (numThreads > 1 && level >= 5) { size1 += (2 << 20) + (4 << 20); numThreads1 = 2; }
+    uint32_t numBlockThreads = (uint32_t)numThreads / numThreads1;
+
+    uint64_t chunkSize = (numBlockThreads != 1) ? SZLzma2ChunkSize(dict) : 0;
+    if (chunkSize == 0) {
+      const uint32_t kBlockSizeMax = (uint32_t)0 - (uint32_t)(1 << 16);
+      uint64_t blockSize = dict + (1 << 16) + (numThreads1 > 1 ? (1 << 20) : 0);
+      blockSize += (blockSize >> (blockSize < ((uint32_t)1 << 30) ? 1 : 2));
+      if (blockSize >= kBlockSizeMax) blockSize = kBlockSizeMax;
+      size += (uint64_t)numBlockThreads * (size1 + blockSize);
+    } else {
+      size += (uint64_t)numBlockThreads * (size1 + chunkSize);
+      const uint32_t numPackChunks = numBlockThreads + (numBlockThreads / 8) + 1;
+      if (chunkSize < ((uint32_t)1 << 26)) numBlockThreads++;
+      if (chunkSize < ((uint32_t)1 << 24)) numBlockThreads++;
+      if (chunkSize < ((uint32_t)1 << 22)) numBlockThreads++;
+      size += (uint64_t)numPackChunks * chunkSize;
+    }
+    r.compressBytes = size;
+    r.decompressBytes = dict + (2 << 20);
+    return r;
+  }
+
+  if (method == SZ_M_DEFLATE) {
+    uint64_t size = 0;
+    uint32_t numMainZipThreads = (uint32_t)numThreads;   // deflate 子线程=1
+    if (numMainZipThreads > 1)
+      size += (uint64_t)numMainZipThreads * ((uint64_t)sizeof(size_t) << 23);
+    else numMainZipThreads = 1;
+    size += (uint64_t)((3 << 20) + (1 << 20)) * numMainZipThreads;   // 4 MB/线程
+    r.compressBytes = size;
+    r.decompressBytes = (2 << 20);
+    return r;
+  }
+  return r;
+}
+} // namespace
 
 #pragma mark - SZCompressOptions
 
 @implementation SZCompressOptions
 - (instancetype)init {
-  if ((self = [super init])) { _level = 5; _solid = YES; _inputPaths = @[]; }
+  if ((self = [super init])) {
+    _level = 5; _solid = YES; _inputPaths = @[];
+    _storeMTime = YES; _timePrecision = SZTimePrecisionDefault;
+  }
   return self;
 }
 @end
@@ -101,6 +199,16 @@ static SZCompressRequest MakeRequest(NSString *archivePath, SZCompressOptions *o
 - (void)cancel { _cancelled.store(true); }
 - (void)setPaused:(BOOL)paused { _paused.store(paused); }
 - (BOOL)isPaused { return _paused.load(); }
+
++ (SZMemoryEstimate)memoryEstimateForFormat:(NSString *)format level:(NSInteger)level threads:(NSInteger)threads {
+  int method = SZ_M_NONE;
+  NSString *f = format.lowercaseString;
+  if      ([f isEqualToString:@"7z"])  method = SZ_M_LZMA2;
+  else if ([f isEqualToString:@"zip"]) method = SZ_M_DEFLATE;   // tar/其它 → 仅存储估算
+  int nt = (int)threads;
+  if (nt < 1) nt = (int)NSProcessInfo.processInfo.activeProcessorCount;
+  return SZEstimate(method, (int)level, nt);
+}
 
 - (void)compressToArchive:(NSString *)archivePath
                   options:(SZCompressOptions *)options

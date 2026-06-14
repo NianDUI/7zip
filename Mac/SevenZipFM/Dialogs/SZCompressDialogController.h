@@ -1,6 +1,6 @@
-// SZCompressDialogController.h —— 压缩对话框（M3-T2，对应 Windows CCompressDialog）。
-// 首版核心字段：归档名/格式/等级/密码/加密文件名 + 输入文件列表。
-// 完整 1:1（方法/字典/Order/Solid/线程/内存估算/分卷/联动矩阵）随 T1 内存估算 + 后续迭代补。
+// SZCompressDialogController.h —— 压缩对话框（M3-T2/T1/T3，对应 Windows CCompressDialog）。
+// 字段：归档名/格式/等级/线程/密码/加密文件名 + 实时内存估算（T1）+ 时间戳/精度（T3）+ 输入列表。
+// 内存估算移植 CompressDialog.cpp::GetMemoryUsage_Threads_Dict_DecompMem（见 SZArchiveCompressor）。
 #import <Cocoa/Cocoa.h>
 @class SZCompressOptions;
 NS_ASSUME_NONNULL_BEGIN
