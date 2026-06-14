@@ -404,10 +404,25 @@
 // Finder 扩展经 NSWorkspace openURL 发来命令。解码 SZShellCommand 后分发到现有 解压/压缩/测试/哈希 流程。
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls {
   for (NSURL *u in urls) {
-    SZShellCommand *cmd = [SZShellCommand commandFromURL:u];
-    if (cmd) [self executeShellCommand:cmd];
-    else NSBeep();
+    if ([u.scheme isEqualToString:@"sevenzip"]) {      // FinderSync 扩展命令
+      SZShellCommand *cmd = [SZShellCommand commandFromURL:u];
+      if (cmd) [self executeShellCommand:cmd]; else NSBeep();
+    } else if (u.isFileURL) {                            // 双击归档/文件（M5-T3 文件关联）
+      [self openFileURL:u];
+    }
   }
+}
+
+// 双击归档→进归档浏览；双击目录→进目录；其他文件→打开所在目录。装载到活动面板。
+- (void)openFileURL:(NSURL *)url {
+  NSString *path = url.path;
+  BOOL isDir = NO;
+  if (![NSFileManager.defaultManager fileExistsAtPath:path isDirectory:&isDir]) { NSBeep(); return; }
+  [NSApp activateIgnoringOtherApps:YES];
+  [_window makeKeyAndOrderFront:nil];
+  if (isDir) [self openDirectory:path];
+  else if ([self isArchivePath:path]) [self openArchiveURL:url];
+  else [self openDirectory:path.stringByDeletingLastPathComponent];
 }
 
 - (void)executeShellCommand:(SZShellCommand *)cmd {

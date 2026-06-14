@@ -20,5 +20,62 @@
       <key>CFBundleURLSchemes</key> <array><string>sevenzip</string></array>
     </dict>
   </array>
+
+  <!-- 文件关联（M5-T3）：声明能打开的归档类型，双击归档用本 app 浏览/解压 -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <!-- 自有/导入类型（7z/xz/zst/lzh/arj/cab）：本 app 作为 Owner -->
+    <dict>
+      <key>CFBundleTypeName</key>   <string>7-Zip 归档</string>
+      <key>CFBundleTypeRole</key>   <string>Viewer</string>
+      <key>LSHandlerRank</key>      <string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>org.7-zip.7-zip-archive</string>
+        <string>org.tukaani.xz-archive</string>
+        <string>org.7-zip.zstd-archive</string>
+      </array>
+    </dict>
+    <!-- 系统已知归档类型：本 app 作为 Alternate（不抢系统默认，用户可手动设默认） -->
+    <dict>
+      <key>CFBundleTypeName</key>   <string>归档文件</string>
+      <key>CFBundleTypeRole</key>   <string>Viewer</string>
+      <key>LSHandlerRank</key>      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.zip-archive</string>
+        <string>public.tar-archive</string>
+        <string>org.gnu.gnu-zip-archive</string>
+        <string>public.bzip2-archive</string>
+        <string>com.rarlab.rar-archive</string>
+      </array>
+    </dict>
+  </array>
+
+  <!-- 为无系统 UTType 的格式补声明（7z/xz/zst），关联扩展名 -->
+  <key>UTImportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>   <string>org.7-zip.7-zip-archive</string>
+      <key>UTTypeDescription</key>  <string>7z 归档</string>
+      <key>UTTypeConformsTo</key>   <array><string>public.data</string><string>public.archive</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict><key>public.filename-extension</key><array><string>7z</string></array></dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key>   <string>org.tukaani.xz-archive</string>
+      <key>UTTypeDescription</key>  <string>xz 归档</string>
+      <key>UTTypeConformsTo</key>   <array><string>public.data</string><string>public.archive</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict><key>public.filename-extension</key><array><string>xz</string></array></dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key>   <string>org.7-zip.zstd-archive</string>
+      <key>UTTypeDescription</key>  <string>zstd 归档</string>
+      <key>UTTypeConformsTo</key>   <array><string>public.data</string><string>public.archive</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict><key>public.filename-extension</key><array><string>zst</string></array></dict>
+    </dict>
+  </array>
 </dict>
 </plist>
