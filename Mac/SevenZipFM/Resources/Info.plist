@@ -12,6 +12,7 @@
   <key>LSMinimumSystemVersion</key> <string>13.0</string>
   <key>NSHighResolutionCapable</key> <true/>
   <key>NSPrincipalClass</key>       <string>NSApplication</string>
+  <key>CFBundleIconFile</key>       <string>AppIcon</string>
   <!-- sevenzip:// URL scheme：供 FinderSync 扩展唤起主 app 执行右键命令（M5-T2） -->
   <key>CFBundleURLTypes</key>
   <array>

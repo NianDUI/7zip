@@ -84,6 +84,7 @@ echo "==[4] 组装 .app bundle + 嵌入 FinderSync 扩展 =="
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$FM/Resources/Info.plist" "$APP/Contents/Info.plist"
+cp "$FM/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"   # 应用图标（CFBundleIconFile=AppIcon）
 cp "$OUT/SevenZipFM.bin" "$APP/Contents/MacOS/SevenZipFM"
 chmod +x "$APP/Contents/MacOS/SevenZipFM"
 
