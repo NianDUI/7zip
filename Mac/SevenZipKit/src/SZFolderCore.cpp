@@ -61,6 +61,8 @@ struct SZFolderCore::Impl {
   CMyComPtr<IFolderFolder>             folder;
   std::vector<CMyComPtr<IFolderFolder>> parents;
   std::vector<std::string>             pathStack;
+  std::vector<std::string>             folderNames;   // 每层进入的 folder name（写操作后重建路径用）
+  std::string                          arcPath;       // 归档磁盘路径（写操作后重新打开用）
   std::vector<SZCoreItem>              items;
   SZSortKey sortKey_   = SZSortKey::Name;   // 默认按名升序（7zFM 初始）
   bool      ascending_ = true;
@@ -156,6 +158,50 @@ struct SZFolderCore::Impl {
     applySort();   // 保持当前排序（导航后亦然）
   }
 
+  // 打开归档并绑定 root（open / 写操作后重开共用）。返回 0=成功。
+  int openArchive(const std::string &fsPath) {
+    CInFileStream *fileSpec = new CInFileStream;
+    CMyComPtr<IInStream> ns = fileSpec;
+    if (!fileSpec->Open(fsPath.c_str())) return 1;
+    CMyComPtr<IFolderManager> nm = new CArchiveFolderManager;
+    const UString aw = GetUnicodeString(AString(fsPath.c_str()));
+    CMyComPtr<IFolderFolder> root;
+    const HRESULT hr = nm->OpenFolderFile(ns, aw.Ptr(), L"", &root, NULL);   // 空串=自动嗅探
+    if (hr != S_OK || !root) return (hr == S_FALSE) ? 2 : (int)hr;
+    stream = ns; mgr = nm; folder = root;
+    parents.clear(); pathStack.clear(); folderNames.clear();
+    arcPath = fsPath;
+    reload();
+    return 0;
+  }
+
+  // 写操作（重写归档）后，旧 folder/parents 全部失效 → 重新打开 + 沿 folderNames 导航回当前层。
+  int reopenAndRebind() {
+    const std::vector<std::string> names = folderNames;   // 先拷贝（openArchive 会清空）
+    const int rc = openArchive(arcPath);
+    if (rc != 0) return rc;
+    for (size_t li = 0; li < names.size(); li++) {
+      const std::string &want = names[li];
+      bool found = false;
+      for (size_t i = 0; i < items.size(); i++) {
+        if (items[i].isDir && items[i].name == want) {
+          CMyComPtr<IFolderFolder> sub;
+          if (folder->BindToFolder((UInt32)items[i].folderIndex, &sub) == S_OK && sub) {
+            parents.push_back(folder);
+            pathStack.push_back(items[i].path);
+            folderNames.push_back(items[i].name);
+            folder = sub;
+            reload();
+            found = true;
+          }
+          break;
+        }
+      }
+      if (!found) break;   // 该层已不存在（如恰好被删），停在当前层
+    }
+    return 0;
+  }
+
   unsigned long long arcProp(PROPID propID) {
     if (!folder) return 0;
     CMyComPtr<IGetFolderArcProps> getter;
@@ -189,19 +235,9 @@ std::vector<std::string> SZFolderCore::ArchiveExtensions() {
   return out;
 }
 
+// arcFormat 必须空串 L""（自动嗅探），不可 NULL（M1-T5 报告发现 3）——见 Impl::openArchive。
 int SZFolderCore::open(const char *fsPath) {
-  CInFileStream *fileSpec = new CInFileStream;
-  _p->stream = fileSpec;
-  if (!fileSpec->Open(fsPath)) return 1;
-  _p->mgr = new CArchiveFolderManager;
-  const UString arcPathW = GetUnicodeString(AString(fsPath));
-  CMyComPtr<IFolderFolder> root;
-  // arcFormat 必须空串 L""（自动嗅探），不可 NULL（M1-T5 报告发现 3）
-  const HRESULT hr = _p->mgr->OpenFolderFile(_p->stream, arcPathW.Ptr(), L"", &root, NULL);
-  if (hr != S_OK || !root) return (hr == S_FALSE) ? 2 : (int)hr;
-  _p->folder = root;
-  _p->reload();
-  return 0;
+  return _p->openArchive(fsPath ? std::string(fsPath) : std::string());
 }
 
 const std::vector<SZCoreItem> &SZFolderCore::items() const { return _p->items; }
@@ -211,9 +247,11 @@ bool SZFolderCore::canGoToParent() const { return !_p->parents.empty(); }
 bool SZFolderCore::enterFolderAtIndex(size_t index) {
   if (index >= _p->items.size() || !_p->items[index].isDir) return false;
   CMyComPtr<IFolderFolder> sub;
-  if (_p->folder->BindToFolder((UInt32)index, &sub) != S_OK || !sub) return false;
+  // 用 folderIndex（原始序号）而非排序后下标：排序后两者不同，按下标会绑错 folder。
+  if (_p->folder->BindToFolder((UInt32)_p->items[index].folderIndex, &sub) != S_OK || !sub) return false;
   _p->parents.push_back(_p->folder);
   _p->pathStack.push_back(_p->items[index].path);
+  _p->folderNames.push_back(_p->items[index].name);
   _p->folder = sub;
   _p->reload();
   return true;
@@ -224,6 +262,7 @@ bool SZFolderCore::enterParentFolder() {
   _p->folder = _p->parents.back();
   _p->parents.pop_back();
   _p->pathStack.pop_back();
+  _p->folderNames.pop_back();
   _p->reload();
   return true;
 }
@@ -292,7 +331,7 @@ int SZFolderCore::deleteItems(const std::vector<size_t> &coreIndices) {
   CMyComPtr<IProgress> prog = new SZUpdateProgress();
   const HRESULT hr = ops->Delete(&idx[0], idx.Size(), prog);
   if (hr != S_OK) return (int)hr;
-  _p->reload();
+  _p->reopenAndRebind();   // 写操作重写归档 → 旧 folder/parents 失效，必须重开重建
   return 0;
 }
 
@@ -302,7 +341,7 @@ int SZFolderCore::createFolder(const std::string &name) {
   CMyComPtr<IProgress> prog = new SZUpdateProgress();
   const HRESULT hr = ops->CreateFolder(ToUString(name).Ptr(), prog);
   if (hr != S_OK) return (int)hr;
-  _p->reload();
+  _p->reopenAndRebind();   // 写操作重写归档 → 旧 folder/parents 失效，必须重开重建
   return 0;
 }
 
@@ -313,7 +352,7 @@ int SZFolderCore::renameItem(size_t coreIndex, const std::string &newName) {
   CMyComPtr<IProgress> prog = new SZUpdateProgress();
   const HRESULT hr = ops->Rename(_p->items[coreIndex].folderIndex, ToUString(newName).Ptr(), prog);
   if (hr != S_OK) return (int)hr;
-  _p->reload();
+  _p->reopenAndRebind();   // 写操作重写归档 → 旧 folder/parents 失效，必须重开重建
   return 0;
 }
 
@@ -330,6 +369,6 @@ int SZFolderCore::addFile(const std::string &fsPath) {
   CMyComPtr<IProgress> prog = new SZUpdateProgress();
   const HRESULT hr = ops->CopyFrom(0, dirU.Ptr(), items, 1, prog);
   if (hr != S_OK) return (int)hr;
-  _p->reload();
+  _p->reopenAndRebind();   // 写操作重写归档 → 旧 folder/parents 失效，必须重开重建
   return 0;
 }

@@ -21,8 +21,12 @@
 @implementation SZTableView
 - (void)keyDown:(NSEvent *)e {
   const unsigned short k = e.keyCode;
-  if (k == 51 || k == 117) {                 // Backspace / Delete → 上级（栈顶逐层退回）
-    if ([_panel goToParent] && _onNavigate) _onNavigate();
+  if (k == 51 || k == 117) {                 // Backspace / Delete
+    if (e.modifierFlags & NSEventModifierFlagCommand) {   // Cmd+Delete → 删除选中（移废纸篓 / 归档重写）
+      [_panel deleteSelectionInteractive];
+    } else if ([_panel goToParent] && _onNavigate) {      // 上级（栈顶逐层退回）
+      _onNavigate();
+    }
     return;
   }
   if (k == 36 || k == 76) {                   // Return / Enter → 进入选中目录 / 打开文件 / 进归档
@@ -178,6 +182,24 @@
   if (!_panel.inArchive) [_panel refresh];
 }
 
+- (void)newFolder:(id)sender {
+  if (_panel.inArchive) {
+    NSAlert *a = [NSAlert new];
+    a.messageText = @"归档内暂不支持新建文件夹";
+    a.informativeText = @"请切换到文件系统目录再新建。";
+    [a addButtonWithTitle:@"好"]; [a runModal];
+    return;
+  }
+  [_panel createFolderInteractive];
+}
+- (void)closeWindow:(id)sender { [_window performClose:sender]; }
+- (void)revealInFinder:(id)sender { [_panel revealSelectionInFinder]; }
+- (void)invertSelection:(id)sender { [_panel invertSelectionInPanel]; [self refreshChrome]; }
+- (void)deleteSelected:(id)sender { [_panel deleteSelectionInteractive]; }
+- (void)sortByName:(id)sender { [_panel sortByColumnID:SZColID_Name]; }
+- (void)sortBySize:(id)sender { [_panel sortByColumnID:SZColID_Size]; }
+- (void)sortByDate:(id)sender { [_panel sortByColumnID:SZColID_Modified]; }
+
 - (void)openLocation:(id)sender {
   NSOpenPanel *p = [NSOpenPanel openPanel];
   p.canChooseFiles = YES;
@@ -249,7 +271,7 @@
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
   if (item.action == @selector(extractTo:) || item.action == @selector(testArchive:))
     return [_panel currentArchiveFSPath] != nil;
-  return YES;
+  return YES;   // 新建文件夹总启用；归档内由 action 内提示（避免置灰看似「没反应」）
 }
 
 @end

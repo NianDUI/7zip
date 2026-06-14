@@ -1,6 +1,13 @@
-// main.m —— SevenZipFM 入口（M1-T7 单面板只读壳）。
+// main.m —— SevenZipFM 入口 + 完整菜单栏（M4-T3）。
 #import <AppKit/AppKit.h>
 #import "SZAppDelegate.h"
+
+static NSMenuItem *AddItem(NSMenu *menu, NSString *title, SEL action, NSString *key) {
+  return [menu addItemWithTitle:title action:action keyEquivalent:key];
+}
+static void SetMods(NSMenuItem *item, NSEventModifierFlags mods) {
+  item.keyEquivalentModifierMask = mods;
+}
 
 int main(int argc, const char **argv) {
   @autoreleasepool {
@@ -10,48 +17,73 @@ int main(int argc, const char **argv) {
     SZAppDelegate *delegate = [SZAppDelegate new];
     app.delegate = delegate;
 
-    // 菜单：应用菜单（关于/退出）+ 文件菜单（解压）
     NSMenu *mainMenu = [NSMenu new];
-    NSMenuItem *appItem = [NSMenuItem new];
-    [mainMenu addItem:appItem];
+
+    // —— 应用菜单 ——
+    NSMenuItem *appItem = [NSMenuItem new]; [mainMenu addItem:appItem];
     NSMenu *appMenu = [NSMenu new];
-    [appMenu addItemWithTitle:@"关于 7-Zip" action:NULL keyEquivalent:@""];
+    AddItem(appMenu, @"关于 7-Zip", NULL, @"");
     [appMenu addItem:[NSMenuItem separatorItem]];
-    [appMenu addItemWithTitle:@"退出 7-Zip" action:@selector(terminate:) keyEquivalent:@"q"];
+    AddItem(appMenu, @"隐藏 7-Zip", @selector(hide:), @"h");
+    SetMods(AddItem(appMenu, @"隐藏其他", @selector(hideOtherApplications:), @"h"),
+            NSEventModifierFlagCommand | NSEventModifierFlagOption);
+    AddItem(appMenu, @"显示全部", @selector(unhideAllApplications:), @"");
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    AddItem(appMenu, @"退出 7-Zip", @selector(terminate:), @"q");
     appItem.submenu = appMenu;
 
-    NSMenuItem *fileItem = [NSMenuItem new];
-    [mainMenu addItem:fileItem];
+    // —— 文件 ——
+    NSMenuItem *fileItem = [NSMenuItem new]; [mainMenu addItem:fileItem];
     NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"文件"];
-    [fileMenu addItemWithTitle:@"打开…" action:@selector(openLocation:) keyEquivalent:@"o"];
-    [fileMenu addItemWithTitle:@"新建归档…" action:@selector(newArchive:) keyEquivalent:@"n"];
+    AddItem(fileMenu, @"打开…", @selector(openLocation:), @"o");
     [fileMenu addItem:[NSMenuItem separatorItem]];
-    [fileMenu addItemWithTitle:@"解压到…" action:@selector(extractTo:) keyEquivalent:@"e"];
-    [fileMenu addItemWithTitle:@"测试" action:@selector(testArchive:) keyEquivalent:@"t"];
+    AddItem(fileMenu, @"新建归档…", @selector(newArchive:), @"n");
+    SetMods(AddItem(fileMenu, @"新建文件夹", @selector(newFolder:), @"n"),
+            NSEventModifierFlagCommand | NSEventModifierFlagShift);
+    [fileMenu addItem:[NSMenuItem separatorItem]];
+    AddItem(fileMenu, @"解压到…", @selector(extractTo:), @"e");
+    AddItem(fileMenu, @"测试", @selector(testArchive:), @"t");
+    [fileMenu addItem:[NSMenuItem separatorItem]];
+    SetMods(AddItem(fileMenu, @"在 Finder 中显示", @selector(revealInFinder:), @"r"),
+            NSEventModifierFlagCommand | NSEventModifierFlagShift);
+    [fileMenu addItem:[NSMenuItem separatorItem]];
+    AddItem(fileMenu, @"关闭窗口", @selector(closeWindow:), @"w");
     fileItem.submenu = fileMenu;
 
-    // 编辑菜单（标准剪切/复制/粘贴/全选）——缺它则文本框/密码框的 Cmd+C/V 无法工作，
-    // 因为这些命令经 responder chain 的 cut:/copy:/paste:/selectAll: 分发，须有菜单项承载。
-    NSMenuItem *editItem = [NSMenuItem new];
-    [mainMenu addItem:editItem];
+    // —— 编辑（标准剪切/复制/粘贴/全选；文本框 Cmd+C/V 须有菜单项承载）——
+    NSMenuItem *editItem = [NSMenuItem new]; [mainMenu addItem:editItem];
     NSMenu *editMenu = [[NSMenu alloc] initWithTitle:@"编辑"];
-    [editMenu addItemWithTitle:@"撤销" action:@selector(undo:) keyEquivalent:@"z"];
-    NSMenuItem *redo = [editMenu addItemWithTitle:@"重做" action:@selector(redo:) keyEquivalent:@"z"];
-    redo.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagShift;
+    AddItem(editMenu, @"撤销", @selector(undo:), @"z");
+    SetMods(AddItem(editMenu, @"重做", @selector(redo:), @"z"),
+            NSEventModifierFlagCommand | NSEventModifierFlagShift);
     [editMenu addItem:[NSMenuItem separatorItem]];
-    [editMenu addItemWithTitle:@"剪切" action:@selector(cut:) keyEquivalent:@"x"];
-    [editMenu addItemWithTitle:@"复制" action:@selector(copy:) keyEquivalent:@"c"];
-    [editMenu addItemWithTitle:@"粘贴" action:@selector(paste:) keyEquivalent:@"v"];
-    [editMenu addItemWithTitle:@"全选" action:@selector(selectAll:) keyEquivalent:@"a"];
+    AddItem(editMenu, @"剪切", @selector(cut:), @"x");
+    AddItem(editMenu, @"复制", @selector(copy:), @"c");
+    AddItem(editMenu, @"粘贴", @selector(paste:), @"v");
+    AddItem(editMenu, @"全选", @selector(selectAll:), @"a");
+    SetMods(AddItem(editMenu, @"反选", @selector(invertSelection:), @"a"),
+            NSEventModifierFlagCommand | NSEventModifierFlagShift);
+    [editMenu addItem:[NSMenuItem separatorItem]];
+    SetMods(AddItem(editMenu, @"删除", @selector(deleteSelected:),
+                    [NSString stringWithFormat:@"%C", (unichar)NSBackspaceCharacter]),
+            NSEventModifierFlagCommand);
     editItem.submenu = editMenu;
 
-    // 显示菜单（刷新）——完整视图菜单留 M4-T3
-    NSMenuItem *viewItem = [NSMenuItem new];
-    [mainMenu addItem:viewItem];
+    // —— 显示 ——
+    NSMenuItem *viewItem = [NSMenuItem new]; [mainMenu addItem:viewItem];
     NSMenu *viewMenu = [[NSMenu alloc] initWithTitle:@"显示"];
-    [viewMenu addItemWithTitle:@"刷新" action:@selector(refresh:) keyEquivalent:@"r"];
+    AddItem(viewMenu, @"刷新", @selector(refresh:), @"r");
+    SetMods(AddItem(viewMenu, @"上级目录", @selector(goUp:),
+                    [NSString stringWithFormat:@"%C", (unichar)NSUpArrowFunctionKey]),
+            NSEventModifierFlagCommand);
+    [viewMenu addItem:[NSMenuItem separatorItem]];
+    AddItem(viewMenu, @"按名称排序", @selector(sortByName:), @"1");
+    AddItem(viewMenu, @"按大小排序", @selector(sortBySize:), @"2");
+    AddItem(viewMenu, @"按修改时间排序", @selector(sortByDate:), @"3");
     viewItem.submenu = viewMenu;
 
+    // 菜单项启用改手动控制（避免自动启用机制把自定义 action 项误判为禁用，致快捷键不触发）。
+    for (NSMenuItem *top in mainMenu.itemArray) top.submenu.autoenablesItems = NO;
     app.mainMenu = mainMenu;
 
     [app run];

@@ -52,6 +52,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// FS：把外部文件拷贝进当前目录；归档：添加到当前层。
 - (BOOL)addFileAtPath:(NSString *)fsPath error:(NSError * _Nullable * _Nullable)error;
 
+@optional
+/// 在当前层新建文件夹（仅 FS 数据源实现；归档暂不支持）。
+- (BOOL)createDirectoryNamed:(NSString *)name error:(NSError * _Nullable * _Nullable)error;
+
 @end
 
 NS_ASSUME_NONNULL_END

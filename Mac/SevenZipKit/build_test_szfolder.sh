@@ -34,6 +34,7 @@ clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/src/SZFolderCore.cpp"     -o "$O
 echo "  ✓ SZNaturalCompare.o + SZFolderCore.o"
 
 echo "==[3] 编译 ObjC 外观 + 测试 driver（ObjC++/ARC，不碰 7-Zip 头）=="
+clang++ "${SZOBJCPP[@]}" -x objective-c++ -c "$KIT/src/SZFolderItem.m"      -o "$OUT/SZFolderItem.o"
 clang++ "${SZOBJCPP[@]}" -x objective-c++ -c "$KIT/src/SZFolderSession.mm"  -o "$OUT/SZFolderSession.o"
 clang++ "${SZOBJCPP[@]}" -x objective-c++ -c "$KIT/tests/test_szfolder.mm" -o "$OUT/test_szfolder.o"
 echo "  ✓ SZFolderSession.o + test_szfolder.o"
@@ -48,7 +49,7 @@ for o in "$ALONE"/*.o; do
   ALONE_OBJS+=("$o")
 done
 clang++ -arch arm64 \
-  "$OUT/test_szfolder.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
+  "$OUT/test_szfolder.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderItem.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/Agent.o" "$OUT/AgentProxy.o" "$OUT/ArchiveFolder.o" "$OUT/ArchiveFolderOpen.o" \
   "$OUT/UpdateCallbackAgent.o" "$OUT/AgentOut.o" "$OUT/ArchiveFolderOut.o" \
   "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/ZipRegistry_mac.o" \

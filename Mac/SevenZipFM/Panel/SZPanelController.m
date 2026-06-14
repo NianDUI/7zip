@@ -144,6 +144,44 @@ NSString *const SZColID_Modified = @"modified";
   if (self.onReload) self.onReload();
 }
 
+- (void)createFolderInteractive {
+  if (![_source respondsToSelector:@selector(createDirectoryNamed:error:)]) { NSBeep(); return; }   // 仅 FS
+  NSAlert *a = [NSAlert new];
+  a.messageText = @"新建文件夹"; a.informativeText = @"输入文件夹名称：";
+  NSTextField *tf = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 260, 24)];
+  tf.stringValue = @"未命名文件夹"; a.accessoryView = tf;
+  [a addButtonWithTitle:@"创建"]; [a addButtonWithTitle:@"取消"];
+  [a.window setInitialFirstResponder:tf];
+  if ([a runModal] != NSAlertFirstButtonReturn) return;
+  NSString *name = tf.stringValue;
+  if (!name.length) return;
+  NSError *err = nil;
+  if ([_source createDirectoryNamed:name error:&err]) [self reload];
+  else { NSAlert *e = [NSAlert alertWithError:err]; e.messageText = @"新建失败"; [e runModal]; }
+}
+
+- (void)revealSelectionInFinder {
+  NSMutableArray<NSURL *> *urls = [NSMutableArray array];
+  if (_source.representsArchive) {
+    if (self.archivePath) [urls addObject:[NSURL fileURLWithPath:self.archivePath]];   // 归档本身
+  } else {
+    [_tableView.selectedRowIndexes enumerateIndexesUsingBlock:^(NSUInteger i, BOOL *stop) {
+      NSString *p = [self->_source fileSystemPathForIndex:i];
+      if (p) [urls addObject:[NSURL fileURLWithPath:p]];
+    }];
+    if (urls.count == 0 && _source.currentPath.length)
+      [urls addObject:[NSURL fileURLWithPath:_source.currentPath]];   // 无选中 → 当前目录
+  }
+  if (urls.count) [NSWorkspace.sharedWorkspace activateFileViewerSelectingURLs:urls];
+  else NSBeep();
+}
+
+- (void)invertSelectionInPanel {
+  [_source invertSelection];
+  [_tableView selectRowIndexes:_source.selectedIndexes byExtendingSelection:NO];
+  if (self.onReload) self.onReload();
+}
+
 #pragma mark 地址 / 状态栏
 
 - (NSString *)addressText {
@@ -405,10 +443,9 @@ NSString *const SZColID_Modified = @"modified";
   [pc beginTestArchive:arc password:nil completion:nil];
 }
 
-// —— 删除（归档 M3-T5 / FS M4-T1：移到废纸篓）——
-- (void)ctxDelete:(id)sender {
-  NSIndexSet *rows = [self contextTargetRows];
-  if (rows.count == 0) return;
+// —— 删除（归档 M3-T5 / FS：移到废纸篓）——
+- (void)deleteRows:(NSIndexSet *)rows {
+  if (rows.count == 0) { NSBeep(); return; }
   if (!_source.canUpdate) {
     NSAlert *a = [NSAlert new];
     a.messageText = @"该归档格式不支持修改"; [a addButtonWithTitle:@"好"]; [a runModal]; return;
@@ -422,6 +459,9 @@ NSString *const SZColID_Modified = @"modified";
   if ([_source deleteItemsAtIndexes:rows error:&err]) [self reload];
   else { NSAlert *a = [NSAlert alertWithError:err]; a.messageText = @"删除失败"; [a runModal]; }
 }
+
+- (void)ctxDelete:(id)sender { [self deleteRows:[self contextTargetRows]]; }            // 右键
+- (void)deleteSelectionInteractive { [self deleteRows:_tableView.selectedRowIndexes]; }  // Cmd+Delete / 菜单
 
 // —— 重命名（归档 M3-T5 / FS M4-T1）——
 - (void)ctxRename:(id)sender {

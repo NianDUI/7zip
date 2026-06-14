@@ -44,6 +44,14 @@ extern NSString *const SZColID_Modified;
 - (BOOL)goToParent;
 /// 刷新当前层（重读数据源 + 重画表 + 按项标识恢复选择）。
 - (void)refresh;
+/// 新建文件夹（仅 FS；弹输入框）。
+- (void)createFolderInteractive;
+/// 在 Finder 中显示选中项（FS）或当前归档文件（归档）；无选中则显示当前目录。
+- (void)revealSelectionInFinder;
+/// 反选当前层选择。
+- (void)invertSelectionInPanel;
+/// 删除当前选中项（带确认；FS 进废纸篓 / 归档重写）。
+- (void)deleteSelectionInteractive;
 /// 点击列头排序（columnID→SZSortColumn，同列切向/新列默认向，逻辑在 SZPanelModel）。
 - (void)sortByColumnID:(NSString *)columnID;
 
