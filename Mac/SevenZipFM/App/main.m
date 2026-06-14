@@ -44,6 +44,24 @@ int main(int argc, const char **argv) {
     AddItem(fileMenu, @"解压到…", @selector(extractTo:), @"e");
     AddItem(fileMenu, @"测试", @selector(testArchive:), @"t");
     [fileMenu addItem:[NSMenuItem separatorItem]];
+    // 校验和（CRC/SHA）子菜单：对选中 FS 项算哈希；representedObject=算法名数组。
+    NSMenuItem *hashRoot = [[NSMenuItem alloc] initWithTitle:@"校验和" action:NULL keyEquivalent:@""];
+    NSMenu *hashMenu = [[NSMenu alloc] initWithTitle:@"校验和"];
+    hashMenu.autoenablesItems = NO;
+    NSArray *hashSpec = @[ @[@"CRC-32", @[@"CRC32"]], @[@"CRC-64", @[@"CRC64"]],
+                           @[@"SHA-1", @[@"SHA1"]], @[@"SHA-256", @[@"SHA256"]],
+                           @[@"BLAKE2sp", @[@"BLAKE2sp"]] ];
+    for (NSArray *spec in hashSpec) {
+      NSMenuItem *it = [hashMenu addItemWithTitle:spec[0] action:@selector(calcChecksum:) keyEquivalent:@""];
+      it.representedObject = spec[1];
+    }
+    [hashMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *allIt = [hashMenu addItemWithTitle:@"全部 (CRC32 · SHA1 · SHA256)"
+                                            action:@selector(calcChecksum:) keyEquivalent:@""];
+    allIt.representedObject = @[@"CRC32", @"SHA1", @"SHA256"];
+    hashRoot.submenu = hashMenu;
+    [fileMenu addItem:hashRoot];
+    [fileMenu addItem:[NSMenuItem separatorItem]];
     SetMods(AddItem(fileMenu, @"在 Finder 中显示", @selector(revealInFinder:), @"r"),
             NSEventModifierFlagCommand | NSEventModifierFlagShift);
     [fileMenu addItem:[NSMenuItem separatorItem]];

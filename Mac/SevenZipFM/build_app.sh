@@ -29,6 +29,7 @@ clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/src/SZNaturalCompare.cpp" -o "$O
 clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/src/SZFolderCore.cpp"     -o "$OUT/SZFolderCore.o"
 clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/src/SZExtractCore.cpp"    -o "$OUT/SZExtractCore.o"
 clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/src/SZCompressCore.cpp"   -o "$OUT/SZCompressCore.o"
+clang++ "${CXXFLAGS[@]}" -I "$KIT/src" -c "$KIT/src/SZHashCore.cpp"       -o "$OUT/SZHashCore.o"
 echo "  ✓"
 
 echo "==[2] SevenZipKit ObjC + SevenZipFM（AppKit）=="
@@ -38,10 +39,12 @@ clang "${OBJC[@]}" -c "$KIT/src/SZFolderItem.m"                        -o "$OUT/
 clang "${OBJC[@]}" -c "$KIT/src/SZFSDataSource.m"                      -o "$OUT/SZFSDataSource.o"
 clang "${OBJC[@]}" -std=c++11 -x objective-c++ -c "$KIT/src/SZArchiveExtractor.mm" -o "$OUT/SZArchiveExtractor.o"
 clang "${OBJC[@]}" -std=c++11 -x objective-c++ -c "$KIT/src/SZArchiveCompressor.mm" -o "$OUT/SZArchiveCompressor.o"
+clang "${OBJC[@]}" -std=c++11 -x objective-c++ -c "$KIT/src/SZHashCalculator.mm" -o "$OUT/SZHashCalculator.o"
 clang "${OBJC[@]}" -c "$FM/Panel/SZPanelController.m"            -o "$OUT/SZPanelController.o"
 clang "${OBJC[@]}" -c "$FM/Progress/SZProgressWindowController.m" -o "$OUT/SZProgressWindowController.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZExtractDialogController.m"   -o "$OUT/SZExtractDialogController.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZCompressDialogController.m"  -o "$OUT/SZCompressDialogController.o"
+clang "${OBJC[@]}" -c "$FM/Dialogs/SZHashResultController.m"     -o "$OUT/SZHashResultController.o"
 clang "${OBJC[@]}" -c "$FM/Util/SZQuarantine.m"                  -o "$OUT/SZQuarantine.o"
 clang "${OBJC[@]}" -c "$FM/App/SZAppDelegate.m"                  -o "$OUT/SZAppDelegate.o"
 clang "${OBJC[@]}" -c "$FM/App/main.m"                           -o "$OUT/main.o"
@@ -58,10 +61,11 @@ for o in "$ALONE"/*.o; do
 done
 clang++ -arch arm64 \
   "$OUT/main.o" "$OUT/SZAppDelegate.o" "$OUT/SZPanelController.o" "$OUT/SZProgressWindowController.o" \
-  "$OUT/SZExtractDialogController.o" "$OUT/SZCompressDialogController.o" "$OUT/SZQuarantine.o" \
+  "$OUT/SZExtractDialogController.o" "$OUT/SZCompressDialogController.o" "$OUT/SZHashResultController.o" "$OUT/SZQuarantine.o" \
   "$OUT/SZPanelModel.o" "$OUT/SZFSDataSource.o" "$OUT/SZFolderItem.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/SZArchiveExtractor.o" "$OUT/SZExtractCore.o" \
   "$OUT/SZArchiveCompressor.o" "$OUT/SZCompressCore.o" \
+  "$OUT/SZHashCalculator.o" "$OUT/SZHashCore.o" \
   "$OUT/Agent.o" "$OUT/AgentProxy.o" "$OUT/ArchiveFolder.o" "$OUT/ArchiveFolderOpen.o" \
   "$OUT/UpdateCallbackAgent.o" "$OUT/AgentOut.o" "$OUT/ArchiveFolderOut.o" \
   "$OUT/DLL.o" "$OUT/WorkDir.o" "$OUT/ZipRegistry_mac.o" \

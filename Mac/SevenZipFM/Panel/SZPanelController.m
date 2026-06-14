@@ -8,6 +8,7 @@
 #import "SZCompressDialogController.h"                      // 右键压缩对话框（FS 添加到归档）
 #import "SZProgressWindowController.h"                      // 右键解压/测试/压缩进度窗
 #import "SevenZipKit/SZArchiveCompressor.h"                // SZCompressOptions
+#import "SZHashResultController.h"                          // 右键校验和（CRC/SHA，M5）
 
 NSString *const SZColID_Name     = @"name";
 NSString *const SZColID_Size     = @"size";
@@ -367,11 +368,52 @@ NSString *const SZColID_Modified = @"modified";
     }
     add(@"压缩…", @selector(ctxCompress:));
   }
+  // 校验和（CRC/SHA）：仅 FS，且有目标（选中或右键行）。归档内项无磁盘路径，不提供。
+  if (!inArchive && (row >= 0 || _tableView.selectedRowIndexes.count > 0))
+    [menu addItem:[self hashSubmenuItem]];
   [menu addItem:[NSMenuItem separatorItem]];
   add(@"删除", @selector(ctxDelete:));
   add(@"重命名…", @selector(ctxRename:));
   [menu addItem:[NSMenuItem separatorItem]];
   add(@"属性", @selector(ctxProperties:));
+}
+
+// 校验和子菜单（对齐 Windows 7-Zip CRC SHA 菜单；representedObject=算法名数组，一次可多算法）。
+- (NSMenuItem *)hashSubmenuItem {
+  NSMenuItem *root = [[NSMenuItem alloc] initWithTitle:@"校验和" action:NULL keyEquivalent:@""];
+  NSMenu *sub = [[NSMenu alloc] init];
+  sub.autoenablesItems = NO;
+  void (^add)(NSString *, NSArray *) = ^(NSString *title, NSArray *methods) {
+    NSMenuItem *it = [sub addItemWithTitle:title action:@selector(ctxHash:) keyEquivalent:@""];
+    it.target = self; it.representedObject = methods;
+  };
+  add(@"CRC-32",   @[@"CRC32"]);
+  add(@"CRC-64",   @[@"CRC64"]);
+  add(@"SHA-1",    @[@"SHA1"]);
+  add(@"SHA-256",  @[@"SHA256"]);
+  add(@"BLAKE2sp", @[@"BLAKE2sp"]);
+  [sub addItem:[NSMenuItem separatorItem]];
+  add(@"全部 (CRC32 · SHA1 · SHA256)", @[@"CRC32", @"SHA1", @"SHA256"]);
+  root.submenu = sub;
+  return root;
+}
+
+- (void)ctxHash:(NSMenuItem *)sender {
+  NSArray<NSString *> *methods = sender.representedObject;
+  NSArray<NSString *> *paths = [self contextTargetFileSystemPaths];
+  if (paths.count == 0 || methods.count == 0) { NSBeep(); return; }
+  [SZHashResultController presentForPaths:paths methods:methods parentWindow:_tableView.window];
+}
+
+// 右键校验和的目标 FS 路径：右键行（在选中集则整个选中集，否则单行），仅 FS。
+- (NSArray<NSString *> *)contextTargetFileSystemPaths {
+  if (_source.representsArchive) return @[];
+  NSMutableArray<NSString *> *a = [NSMutableArray array];
+  [[self contextTargetRows] enumerateIndexesUsingBlock:^(NSUInteger i, BOOL *stop) {
+    NSString *p = [self->_source fileSystemPathForIndex:i];
+    if (p) [a addObject:p];
+  }];
+  return a;
 }
 
 // 右键目标行：clickedRow 在选中集则用整个选中集，否则用 clickedRow 单行

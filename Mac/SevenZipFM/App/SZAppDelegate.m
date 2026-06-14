@@ -5,6 +5,7 @@
 #import "SZProgressWindowController.h"
 #import "SZExtractDialogController.h"
 #import "SZCompressDialogController.h"
+#import "SZHashResultController.h"
 #import "SevenZipKit/SZPanelModel.h"
 #import "SevenZipKit/SZFSDataSource.h"
 #import "SevenZipKit/SZFolderSession.h"
@@ -352,6 +353,25 @@
   if (!arc) { NSBeep(); return; }
   SZProgressWindowController *pc = [SZProgressWindowController new];
   [pc beginTestArchive:arc password:nil completion:nil];
+}
+
+// 校验和（CRC/SHA）：对活动面板选中的 FS 文件/目录算哈希；无选中→当前目录。sender.representedObject=算法名数组。
+- (void)calcChecksum:(id)sender {
+  if (self.activePanel.inArchive) {
+    NSAlert *a = [NSAlert new];
+    a.messageText = @"归档内项暂不支持校验和";
+    a.informativeText = @"请选择文件系统中的文件或文件夹。";
+    [a addButtonWithTitle:@"好"]; [a runModal]; return;
+  }
+  NSArray<NSString *> *paths = [self.activePanel selectedFileSystemPaths];
+  if (paths.count == 0) {
+    NSString *dir = [self.activePanel currentDirectoryFSPath];
+    if (dir) paths = @[dir];   // 无选中 → 对当前整个目录
+  }
+  if (paths.count == 0) { NSBeep(); return; }
+  NSArray<NSString *> *methods = [sender isKindOfClass:NSMenuItem.class] ? [(NSMenuItem *)sender representedObject] : nil;
+  if (methods.count == 0) methods = @[@"CRC32", @"SHA256"];
+  [SZHashResultController presentForPaths:paths methods:methods parentWindow:_window];
 }
 
 - (void)newArchive:(id)sender {
