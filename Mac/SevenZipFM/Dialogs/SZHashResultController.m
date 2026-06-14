@@ -1,6 +1,7 @@
 // SZHashResultController.m —— 校验和结果窗实现（M5）。
 #import "SZHashResultController.h"
 #import "SevenZipKit/SZHashCalculator.h"
+#import "SZDockProgress.h"   // Dock 图标进度（M5 打磨）
 
 @interface SZHashResultController () <SZHashDelegate>
 @end
@@ -110,6 +111,7 @@ static NSMutableSet<SZHashResultController *> *gLive;
 
 - (void)startWithPaths:(NSArray<NSString *> *)paths {
   _calc = [SZHashCalculator new];
+  [[SZDockProgress shared] beginOperation];
   __weak typeof(self) ws = self;
   [_calc calculateForPaths:paths methods:_methods delegate:self completion:^(SZHashSummary *sum) {
     [ws finishWithSummary:sum];
@@ -128,6 +130,7 @@ static NSMutableSet<SZHashResultController *> *gLive;
         completedBytes:(uint64_t)completed
             totalBytes:(uint64_t)total {
   _progress.doubleValue = fraction;
+  [[SZDockProgress shared] updateFraction:fraction];
 }
 
 - (void)hashCalculator:(SZHashCalculator *)calc didFinishFile:(SZHashItem *)item {
@@ -148,6 +151,7 @@ static NSMutableSet<SZHashResultController *> *gLive;
 }
 
 - (void)finishWithSummary:(SZHashSummary *)sum {
+  [[SZDockProgress shared] endOperation];
   _done = YES;
   _progress.doubleValue = sum.ok ? 1.0 : _progress.doubleValue;
   _progress.hidden = YES;

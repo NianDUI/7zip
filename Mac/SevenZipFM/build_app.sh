@@ -42,6 +42,7 @@ clang "${OBJC[@]}" -std=c++11 -x objective-c++ -c "$KIT/src/SZArchiveCompressor.
 clang "${OBJC[@]}" -std=c++11 -x objective-c++ -c "$KIT/src/SZHashCalculator.mm" -o "$OUT/SZHashCalculator.o"
 clang "${OBJC[@]}" -c "$FM/Panel/SZPanelController.m"            -o "$OUT/SZPanelController.o"
 clang "${OBJC[@]}" -c "$FM/Progress/SZProgressWindowController.m" -o "$OUT/SZProgressWindowController.o"
+clang "${OBJC[@]}" -c "$FM/Progress/SZDockProgress.m"            -o "$OUT/SZDockProgress.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZExtractDialogController.m"   -o "$OUT/SZExtractDialogController.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZCompressDialogController.m"  -o "$OUT/SZCompressDialogController.o"
 clang "${OBJC[@]}" -c "$FM/Dialogs/SZHashResultController.m"     -o "$OUT/SZHashResultController.o"
@@ -62,7 +63,7 @@ for o in "$ALONE"/*.o; do
   ALONE_OBJS+=("$o")
 done
 clang++ -arch arm64 \
-  "$OUT/main.o" "$OUT/SZAppDelegate.o" "$OUT/SZPanelController.o" "$OUT/SZProgressWindowController.o" \
+  "$OUT/main.o" "$OUT/SZAppDelegate.o" "$OUT/SZPanelController.o" "$OUT/SZProgressWindowController.o" "$OUT/SZDockProgress.o" \
   "$OUT/SZExtractDialogController.o" "$OUT/SZCompressDialogController.o" "$OUT/SZHashResultController.o" "$OUT/SZShellCommand.o" "$OUT/SZQuarantine.o" \
   "$OUT/SZPanelModel.o" "$OUT/SZFSDataSource.o" "$OUT/SZFolderItem.o" "$OUT/SZFolderSession.o" "$OUT/SZFolderCore.o" "$OUT/SZNaturalCompare.o" \
   "$OUT/SZArchiveExtractor.o" "$OUT/SZExtractCore.o" \

@@ -3,6 +3,7 @@
 #import "SevenZipKit/SZArchiveExtractor.h"
 #import "SevenZipKit/SZArchiveCompressor.h"   // 压缩（M3-T2）
 #import "SZQuarantine.h"   // 网络来源标记传播（M2-T7）
+#import "SZDockProgress.h" // Dock 图标进度（M5 打磨）
 
 @interface SZProgressWindowController () <SZArchiveExtractDelegate, SZArchiveCompressDelegate>
 @end
@@ -161,6 +162,8 @@ static NSMutableSet *g_alive;
     [_pauseButton.trailingAnchor constraintEqualToAnchor:_cancelButton.leadingAnchor constant:-10],
     [_pauseButton.centerYAnchor constraintEqualToAnchor:_cancelButton.centerYAnchor],
   ]];
+
+  [[SZDockProgress shared] beginOperation];   // Dock 图标进度（finishWithOK 配对 endOperation）
 }
 
 #pragma mark - 统计刷新（NSTimer 拉取）
@@ -213,6 +216,8 @@ static NSString *FormatElapsed(NSTimeInterval s) {
       ? [NSString stringWithFormat:@"%d%%  ", (int)(100.0 * _completedBytes / _totalBytes)] : @"";
   _window.title = [NSString stringWithFormat:@"%@%@%@ %@",
       _paused ? @"[暂停] " : @"", pctPrefix, _verb, _archiveName];
+
+  [[SZDockProgress shared] updateFraction:knownTotal ? (double)_completedBytes / (double)_totalBytes : -1];
 }
 
 - (void)onPauseResume:(id)sender {
@@ -241,6 +246,7 @@ static NSString *FormatElapsed(NSTimeInterval s) {
 - (void)finishWithOK:(BOOL)ok errorMessage:(NSString *)em {
   _finished = YES;
   [_timer invalidate]; _timer = nil;
+  [[SZDockProgress shared] endOperation];   // 配对 buildWindow 的 beginOperation
   [_window orderOut:nil];
 
   // 网络来源标记传播：源归档带 quarantine 时，给本次新解出的顶层项打 quarantine（M2-T7）
