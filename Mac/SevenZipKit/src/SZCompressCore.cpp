@@ -186,6 +186,10 @@ SZCompressResult SZCompressCore::run(const SZCompressRequest &req, SZCompressDel
     else { std::string n = kv.substr(0, eq); AddProp(P, n.c_str(), ToUString(kv.substr(eq + 1))); }
   }
 
+  // 符号链接/时间保留（T3 二级选项）
+  options.SymLinks.Val = req.storeSymlinks; options.SymLinks.Def = true;
+  options.PreserveATime = req.preserveATime;
+
   // 分卷（→ archive.7z.001/.002…；解压侧引擎自动探测序列）
   if (req.volumeSize) options.VolumesSizes.Add(req.volumeSize);
 

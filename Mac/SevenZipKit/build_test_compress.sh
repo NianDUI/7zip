@@ -97,5 +97,14 @@ if [ "$NVOL" -ge 2 ]; then echo "  ✓ 已分卷（≥2 卷）"; else echo "  �
 ( cd "$OUT" && "$OUT/7zz" x -y -o"back_vol" vol.7z.001 >/dev/null 2>&1 )
 if diff -r "$OUT/src" "$OUT/back_vol/src" >/dev/null 2>&1; then echo "  ✓ 从 .001 合并解压字节一致"; else echo "  ✗ 合并解压不一致"; FAIL=1; fi
 
+echo "===== G) 符号链接保留（storeSymlinks 默认，T3）====="
+rm -rf "$OUT/lnksrc" "$OUT/back_lnk"; mkdir -p "$OUT/lnksrc"
+echo "real content" > "$OUT/lnksrc/real.txt"
+( cd "$OUT/lnksrc" && ln -s real.txt link.txt )
+rm -f "$OUT/lnk.7z"
+( cd "$OUT" && "$OUT/test_compress" lnk.7z lnksrc >/dev/null )
+( cd "$OUT" && "$OUT/7zz" x -y -snl -o"back_lnk" lnk.7z >/dev/null 2>&1 )
+if [ -L "$OUT/back_lnk/lnksrc/link.txt" ]; then echo "  ✓ 符号链接保留为链接（未解引用）"; else echo "  ✗ 符号链接被解引用成普通文件"; FAIL=1; fi
+
 echo ""
 [ "$FAIL" = 0 ] && echo "===== M3-T4 压缩核心全部通过 =====" || { echo "===== 有用例失败 ====="; exit 1; }

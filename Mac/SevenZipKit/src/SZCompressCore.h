@@ -35,6 +35,8 @@ struct SZCompressRequest {
   std::string password;
   bool encryptHeader = false;              // 加密文件名（7z -mhe=on）
   uint64_t volumeSize = 0;                 // 分卷大小（字节）；0=不分卷（→ .001/.002…）
+  bool storeSymlinks = true;               // 存储符号链接本身而非跟随（mac symlink，对应 -snl，T3）
+  bool preserveATime = false;              // 保留访问时间（T3）
   std::vector<std::string> extraProperties; // 额外 "name=value" 属性（透传，覆盖以上）
 };
 
