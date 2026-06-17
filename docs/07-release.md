@@ -24,9 +24,10 @@
 | 更新说明 | **annotated tag 的 message** | 打 tag 时 `-m` 写「本次更新」，`release.sh` 自动读出拼进 release body；贴合「tag = 发版」习惯 |
 | 上传 | `gh release create`（Claude 进程可直接跑） | gh token 今日验证可由 Claude 的 Bash 进程直接读取；早先「必须用 `!`」是回传故障期误判 |
 
-**两条版本线**（别混）：
+**三条版本线**（别混）：
 1. **产品版本** = `Mac/SevenZipFM/Resources/Info.plist` 的 `CFBundleShortVersionString`（注入 app + dmg 文件名）
 2. **发版 tag** = `mac-vX.Y`（GitHub Release 的标识）
+3. **内核版本** = 上游 7-Zip（`C/7zVersion.h` 的 `MY_VERSION_NUMBERS`，当前 `26.01`）；`release.sh` 自动读出注入 release body，零维护——同步上游升级后自动跟变
 
 ## 2. 工具与文件
 
@@ -47,7 +48,7 @@ git push origin mac-v0.2
 bash Mac/SevenZipFM/release.sh mac-v0.2
 ```
 
-`release.sh` 自动完成：构建 dmg → 算真实 SHA256 → 组装 body（`## 本次更新` + 固定安装/解隔离说明 + `## 校验`）→ `gh release create mac-v0.2 ... --latest`。
+`release.sh` 自动完成：构建 dmg → 算真实 SHA256 → 读 `C/7zVersion.h` 取内核版本 → 组装 body（`> 内核基于 7-Zip XX.XX` + `## 本次更新` + 固定安装/解隔离说明 + `## 校验`）→ `gh release create mac-v0.2 ... --latest`。
 
 - 忘了 `-m`（或打 lightweight tag）也能发，只是 body 没有「本次更新」段，不会误取 commit message。
 - 改产品版本：先改 `Info.plist` 的 `CFBundleShortVersionString`，`release.sh` 会软检查 dmg 版本与 tag 版本是否一致。
