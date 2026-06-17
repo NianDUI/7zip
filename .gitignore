@@ -6,3 +6,9 @@ b/
 
 # macOS 桌面元数据
 .DS_Store
+
+# Release 产物（dmg 走 GitHub Release，不进 git）
+dist/
+
+# Claude Code 机器本地设置（CLAUDE.md 入库，settings.local.json 不入库）
+.claude/settings.local.json
