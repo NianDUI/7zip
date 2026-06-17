@@ -83,4 +83,5 @@ gh release create mac-vX.Y dist/7-Zip-*.dmg \
 - `03-feature-map-filemanager` / `04-feature-map-dialogs-finder` —— Windows→mac 功能映射
 - `05-roadmap-execution` —— 路线图与里程碑（M0–M5）执行记录
 - `06-adversarial-review-record` —— 对抗性评审记录
+- `07-release` —— 发版方案与已发布版本记录（build_dmg.sh/release.sh、mac-vX.Y、gh release）
 - `M*-report.md` —— 各里程碑/任务的验收报告

@@ -9,3 +9,7 @@
 - 终端运行：`xattr -dr com.apple.quarantine /Applications/7-Zip.app`
 
 含 Finder 右键扩展（首次需到 系统设置 → 隐私与安全性 → 扩展 启用）。
+
+---
+基于 [7-Zip](https://7-zip.org)（© 1999–2026 Igor Pavlov，GNU LGPL-2.1，含 unRAR 限制）的**非官方** macOS 移植，与 7-zip.org 无关、未获背书。
+源码与完整许可：https://github.com/NianDUI/7zip （`DOC/copying.txt`、`Mac/LICENSE`）。
