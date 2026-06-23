@@ -21,6 +21,7 @@
   SZHashSummary *_summary;
   NSByteCountFormatter *_sizeFmt;
   BOOL _done;
+  void (^_onClose)(void);   // 结果窗关闭回调（Finder 右键无主窗口场景）
 }
 
 static NSMutableSet<SZHashResultController *> *gLive;
@@ -32,9 +33,21 @@ static NSString *const kColSize = @"__size";
 + (void)presentForPaths:(NSArray<NSString *> *)paths
                 methods:(NSArray<NSString *> *)methods
            parentWindow:(NSWindow *)parent {
-  if (paths.count == 0 || methods.count == 0) { NSBeep(); return; }
+  [self presentForPaths:paths methods:methods parentWindow:parent onClose:nil];
+}
+
++ (void)presentForPaths:(NSArray<NSString *> *)paths
+                methods:(NSArray<NSString *> *)methods
+           parentWindow:(NSWindow *)parent
+                onClose:(void (^)(void))onClose {
+  if (paths.count == 0 || methods.count == 0) {
+    NSBeep();
+    if (onClose) onClose();   // 无效调用也要让调用方收尾（否则冷启动的 app 不退出）
+    return;
+  }
   static dispatch_once_t once; dispatch_once(&once, ^{ gLive = [NSMutableSet set]; });
   SZHashResultController *c = [[SZHashResultController alloc] initWithMethods:methods];
+  c->_onClose = [onClose copy];
   [gLive addObject:c];
   [c showRelativeTo:parent];
   [c startWithPaths:paths];
@@ -263,7 +276,9 @@ static CGFloat HashColWidth(NSString *method) {
 
 - (void)windowWillClose:(NSNotification *)note {
   if (!_done) [_calc cancel];
-  [gLive removeObject:self];
+  void (^cb)(void) = _onClose; _onClose = nil;
+  [gLive removeObject:self];   // 可能触发 self 释放，故 cb 先取局部强引用
+  if (cb) cb();
 }
 
 @end

@@ -10,6 +10,12 @@ NS_ASSUME_NONNULL_BEGIN
                 methods:(NSArray<NSString *> *)methods
            parentWindow:(nullable NSWindow *)parent;
 
+/// 同上，但结果窗关闭时回调 onClose（供 Finder 右键无主窗口场景：关闭后决定是否退出 app）。
++ (void)presentForPaths:(NSArray<NSString *> *)paths
+                methods:(NSArray<NSString *> *)methods
+           parentWindow:(nullable NSWindow *)parent
+                onClose:(nullable void (^)(void))onClose;
+
 @end
 
 NS_ASSUME_NONNULL_END

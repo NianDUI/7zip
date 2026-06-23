@@ -48,13 +48,28 @@ static NSMutableSet *g_alive;
   c->_parent = parent;
   [c buildWindowWithDefault:defaultArchivePath];
 
-  __weak typeof(c) wc = c;
-  [parent beginSheet:c->_window completionHandler:^(NSModalResponse resp) {
-    typeof(c) sc = wc;
-    if (sc->_completion) sc->_completion(resp == NSModalResponseOK ? sc->_resultPath : nil,
-                                          resp == NSModalResponseOK ? sc->_resultOptions : nil);
-    [g_alive removeObject:sc];
-  }];
+  if (parent) {
+    __weak typeof(c) wc = c;
+    [parent beginSheet:c->_window completionHandler:^(NSModalResponse resp) {
+      typeof(c) sc = wc;
+      if (sc->_completion) sc->_completion(resp == NSModalResponseOK ? sc->_resultPath : nil,
+                                            resp == NSModalResponseOK ? sc->_resultOptions : nil);
+      [g_alive removeObject:sc];
+    }];
+  } else {
+    // 无父窗口（Finder 右键，主文件管理器窗口未显示）→ 独立窗口呈现。
+    [c->_window center];
+    [c->_window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+  }
+}
+
+// 独立窗口（无 parent）下结束：回调 completion 并解除自持。
+- (void)finishStandaloneWithPath:(NSString *)path options:(SZCompressOptions *)options {
+  [_window orderOut:nil];
+  void (^cb)(NSString *, SZCompressOptions *) = _completion; _completion = nil;
+  [g_alive removeObject:self];
+  if (cb) cb(path, options);
 }
 
 - (NSTextField *)label:(NSString *)s {
@@ -203,8 +218,12 @@ static NSMutableSet *g_alive;
 }
 
 - (void)onCancel:(id)sender {
-  [_parent endSheet:_window returnCode:NSModalResponseCancel];
-  [_window orderOut:nil];
+  if (_parent) {
+    [_parent endSheet:_window returnCode:NSModalResponseCancel];
+    [_window orderOut:nil];
+  } else {
+    [self finishStandaloneWithPath:nil options:nil];
+  }
 }
 
 - (void)onOK:(id)sender {
@@ -234,8 +253,12 @@ static NSMutableSet *g_alive;
   _resultPath = path;
   _resultOptions = o;
 
-  [_parent endSheet:_window returnCode:NSModalResponseOK];
-  [_window orderOut:nil];
+  if (_parent) {
+    [_parent endSheet:_window returnCode:NSModalResponseOK];
+    [_window orderOut:nil];
+  } else {
+    [self finishStandaloneWithPath:_resultPath options:_resultOptions];
+  }
 }
 
 @end

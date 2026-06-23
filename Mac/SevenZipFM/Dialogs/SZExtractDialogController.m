@@ -43,12 +43,27 @@ static NSMutableSet *g_alive;
   c->_parent = parent;
   [c buildWindowForArchive:archiveName defaultDest:defaultDest];
 
-  __weak typeof(c) wc = c;
-  [parent beginSheet:c->_window completionHandler:^(NSModalResponse resp) {
-    typeof(c) sc = wc;
-    if (sc->_completion) sc->_completion(resp == NSModalResponseOK ? sc->_result : nil);
-    [g_alive removeObject:sc];
-  }];
+  if (parent) {
+    __weak typeof(c) wc = c;
+    [parent beginSheet:c->_window completionHandler:^(NSModalResponse resp) {
+      typeof(c) sc = wc;
+      if (sc->_completion) sc->_completion(resp == NSModalResponseOK ? sc->_result : nil);
+      [g_alive removeObject:sc];
+    }];
+  } else {
+    // 无父窗口（Finder 右键，主文件管理器窗口未显示）→ 独立窗口呈现。
+    [c->_window center];
+    [c->_window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+  }
+}
+
+// 独立窗口（无 parent）下结束：回调 completion 并解除自持。
+- (void)finishStandaloneWithResult:(SZArchiveExtractOptions *)result {
+  [_window orderOut:nil];
+  void (^cb)(SZArchiveExtractOptions *) = _completion; _completion = nil;
+  [g_alive removeObject:self];
+  if (cb) cb(result);
 }
 
 #pragma mark - 构建
@@ -152,8 +167,12 @@ static NSMutableSet *g_alive;
 }
 
 - (void)onCancel:(id)sender {
-  [_parent endSheet:_window returnCode:NSModalResponseCancel];
-  [_window orderOut:nil];
+  if (_parent) {
+    [_parent endSheet:_window returnCode:NSModalResponseCancel];
+    [_window orderOut:nil];
+  } else {
+    [self finishStandaloneWithResult:nil];
+  }
 }
 
 - (void)onOK:(id)sender {
@@ -169,8 +188,12 @@ static NSMutableSet *g_alive;
   _result = o;
 
   SaveHistory(dest);
-  [_parent endSheet:_window returnCode:NSModalResponseOK];
-  [_window orderOut:nil];
+  if (_parent) {
+    [_parent endSheet:_window returnCode:NSModalResponseOK];
+    [_window orderOut:nil];
+  } else {
+    [self finishStandaloneWithResult:_result];
+  }
 }
 
 @end

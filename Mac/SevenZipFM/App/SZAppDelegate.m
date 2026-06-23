@@ -62,6 +62,8 @@
   NSArray<NSLayoutConstraint *> *_soloConstraints;   // 单面板专属（左面板 trailing 撑满）
   NSMutableArray<NSURL *> *_pendingURLs;   // 冷启动时 openURLs 早于面板就绪 → 先缓存，didFinishLaunching 后执行
   BOOL _launched;
+  BOOL _mainWindowEverShown;   // 主文件管理器窗口是否曾对用户显示（决定 Finder 右键一次性操作完成后是否退出 app）
+  NSInteger _liveShellOps;     // 进行中的 Finder 右键一次性操作数（解压/压缩/测试/校验和）
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
@@ -121,8 +123,9 @@
   ];
   _window.contentView = content;
 
-  [_window makeKeyAndOrderFront:nil];
-  [NSApp activateIgnoringOtherApps:YES];
+  // Finder 右键的一次性命令（解压/压缩/测试/校验和）冷启动时，openURLs 已缓存到 _pendingURLs；
+  // 这类操作不该弹出文件管理器主窗口（对齐 Windows 右键→独立 7zG 子进程，做完即走）。
+  if ([self pendingURLsNeedMainWindow]) [self showMainWindow];
 
   // 两面板各装载入口位置（命令行参数给左面板，右面板用 home）
   NSArray<NSString *> *args = NSProcessInfo.processInfo.arguments;
@@ -447,53 +450,102 @@
   NSString *path = url.path;
   BOOL isDir = NO;
   if (![NSFileManager.defaultManager fileExistsAtPath:path isDirectory:&isDir]) { NSBeep(); return; }
-  [NSApp activateIgnoringOtherApps:YES];
-  [_window makeKeyAndOrderFront:nil];
+  [self showMainWindow];
   if (isDir) [self openDirectory:path];
   else if ([self isArchivePath:path]) [self openArchiveURL:url];
   else [self openDirectory:path.stringByDeletingLastPathComponent];
 }
 
-- (void)executeShellCommand:(SZShellCommand *)cmd {
-  [NSApp activateIgnoringOtherApps:YES];
+#pragma mark Finder 右键一次性操作：主窗口显隐 + 完成后退出
+
+// 显示文件管理器主窗口（「打开」命令、双击文件、普通启动）。一旦显示，shell 操作完成后不再自动退出。
+- (void)showMainWindow {
+  _mainWindowEverShown = YES;
   [_window makeKeyAndOrderFront:nil];
+  [NSApp activateIgnoringOtherApps:YES];
+}
+
+// 主窗口可见时作 sheet 宿主；不可见（纯右键命令冷启动）时返回 nil → 对话框独立窗口呈现。
+- (NSWindow *)shellDialogParent { return _window.isVisible ? _window : nil; }
+
+- (void)beginShellOp { _liveShellOps++; }
+- (void)endShellOp {
+  if (_liveShellOps > 0) _liveShellOps--;
+  [self terminateIfDoneShellOps];
+}
+
+// 一次性命令全部结束、且文件管理器主窗口从未显示（app 是为该命令而冷启动）→ 退出，不在 Dock 残留。
+// 延到下一 runloop 执行：避免在 didFinishLaunching/完成回调的同步栈里 terminate，并二次确认防竞态。
+- (void)terminateIfDoneShellOps {
+  if (_liveShellOps != 0 || _mainWindowEverShown) return;
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (self->_liveShellOps == 0 && !self->_mainWindowEverShown) [NSApp terminate:nil];
+  });
+}
+
+// 该批 URL 是否需要文件管理器主窗口：双击文件 / 「打开」命令需要；纯一次性命令（解压/压缩/测试/哈希）不需要。
+- (BOOL)urlNeedsMainWindow:(NSURL *)u {
+  if (u.isFileURL) return YES;
+  if ([u.scheme isEqualToString:@"sevenzip"]) {
+    SZShellCommand *cmd = [SZShellCommand commandFromURL:u];
+    return !cmd || cmd.op == SZShellOpOpen;   // 解码失败也显示主窗口（保守）
+  }
+  return YES;
+}
+- (BOOL)pendingURLsNeedMainWindow {
+  if (_pendingURLs.count == 0) return YES;   // 普通启动（双击 app）→ 显示主窗口
+  for (NSURL *u in _pendingURLs) if ([self urlNeedsMainWindow:u]) return YES;
+  return NO;
+}
+
+- (void)executeShellCommand:(SZShellCommand *)cmd {
   NSArray<NSString *> *paths = cmd.paths;
-  if (paths.count == 0) { NSBeep(); return; }
+  if (paths.count == 0) { NSBeep(); [self terminateIfDoneShellOps]; return; }
   NSString *first = paths.firstObject;
+  __weak typeof(self) ws = self;
 
   switch (cmd.op) {
     case SZShellOpOpen:
+      [self showMainWindow];   // 「打开」要进文件管理器浏览
       [self openArchiveURL:[NSURL fileURLWithPath:first]];
       break;
     case SZShellOpExtract:        [self shellExtract:first dialog:YES toFolder:NO]; break;
     case SZShellOpExtractHere:    [self shellExtract:first dialog:NO  toFolder:NO]; break;
     case SZShellOpExtractToFolder:[self shellExtract:first dialog:NO  toFolder:YES]; break;
     case SZShellOpTest: {
+      [self beginShellOp];
       SZProgressWindowController *pc = [SZProgressWindowController new];
-      [pc beginTestArchive:first password:nil completion:nil];
+      [pc beginTestArchive:first password:nil completion:^(BOOL ok){ [ws endShellOp]; }];
       break;
     }
     case SZShellOpCompress:    [self shellCompress:paths format:nil    dialog:YES]; break;
     case SZShellOpCompress7z:  [self shellCompress:paths format:@"7z"  dialog:NO];  break;
     case SZShellOpCompressZip: [self shellCompress:paths format:@"zip" dialog:NO];  break;
     case SZShellOpHash: {
+      [self beginShellOp];
       NSArray<NSString *> *methods = cmd.methods.count ? cmd.methods : @[@"CRC32", @"SHA256"];
-      [SZHashResultController presentForPaths:paths methods:methods parentWindow:_window];
+      [SZHashResultController presentForPaths:paths methods:methods
+                                 parentWindow:[self shellDialogParent]
+                                      onClose:^{ [ws endShellOp]; }];
       break;
     }
-    default: NSBeep();
+    default: NSBeep(); [self terminateIfDoneShellOps];
   }
 }
 
+// 仅由 executeShellCommand 调用（Finder 右键）。整条链路记一次 shell 操作：beginShellOp →
+// 取消 / 进度窗完成 时 endShellOp，使无主窗口的冷启动场景在收尾后退出。
 - (void)shellExtract:(NSString *)archive dialog:(BOOL)dialog toFolder:(BOOL)toFolder {
-  if (![NSFileManager.defaultManager fileExistsAtPath:archive]) { NSBeep(); return; }
+  if (![NSFileManager.defaultManager fileExistsAtPath:archive]) { NSBeep(); [self terminateIfDoneShellOps]; return; }
+  [self beginShellOp];
+  __weak typeof(self) ws = self;
   NSString *parent = archive.stringByDeletingLastPathComponent;
   if (dialog) {
-    [SZExtractDialogController presentForArchive:archive.lastPathComponent defaultDestination:parent parentWindow:_window
+    [SZExtractDialogController presentForArchive:archive.lastPathComponent defaultDestination:parent parentWindow:[self shellDialogParent]
                                       completion:^(SZArchiveExtractOptions *options) {
-      if (!options) return;
+      if (!options) { [ws endShellOp]; return; }   // 取消对话框 → 操作结束
       SZProgressWindowController *pc = [SZProgressWindowController new];
-      [pc beginExtractArchive:archive options:options completion:nil];
+      [pc beginExtractArchive:archive options:options completion:^(BOOL ok){ [ws endShellOp]; }];
     }];
     return;
   }
@@ -504,21 +556,24 @@
   o.pathMode = SZExtractPathModeFull;
   o.overwriteMode = toFolder ? SZExtractOverwriteModeOverwrite : SZExtractOverwriteModeAsk;
   SZProgressWindowController *pc = [SZProgressWindowController new];
-  [pc beginExtractArchive:archive options:o completion:nil];
+  [pc beginExtractArchive:archive options:o completion:^(BOOL ok){ [ws endShellOp]; }];
 }
 
+// 仅由 executeShellCommand 调用（Finder 右键）。op 生命周期同 shellExtract。
 - (void)shellCompress:(NSArray<NSString *> *)inputs format:(NSString *)format dialog:(BOOL)dialog {
-  if (inputs.count == 0) { NSBeep(); return; }
+  if (inputs.count == 0) { NSBeep(); [self terminateIfDoneShellOps]; return; }
+  [self beginShellOp];
+  __weak typeof(self) ws = self;
   NSString *parent = [inputs.firstObject stringByDeletingLastPathComponent];
   NSString *base = [SZShellCommand archiveBaseNameForPaths:inputs];
   NSString *ext = format ?: @"7z";
   NSString *defArc = [parent stringByAppendingPathComponent:[base stringByAppendingPathExtension:ext]];
   if (dialog) {
-    [SZCompressDialogController presentForInputs:inputs defaultArchivePath:defArc parentWindow:_window
+    [SZCompressDialogController presentForInputs:inputs defaultArchivePath:defArc parentWindow:[self shellDialogParent]
                                       completion:^(NSString *archivePath, SZCompressOptions *options) {
-      if (!archivePath || !options) return;
+      if (!archivePath || !options) { [ws endShellOp]; return; }   // 取消对话框 → 操作结束
       SZProgressWindowController *pc = [SZProgressWindowController new];
-      [pc beginCompressToArchive:archivePath options:options completion:nil];
+      [pc beginCompressToArchive:archivePath options:options completion:^(BOOL ok){ [ws endShellOp]; }];
     }];
     return;
   }
@@ -530,7 +585,7 @@
   o.solid = [ext isEqualToString:@"7z"];
   o.storeMTime = YES;
   SZProgressWindowController *pc = [SZProgressWindowController new];
-  [pc beginCompressToArchive:[self uniqueArchivePath:defArc] options:o completion:nil];
+  [pc beginCompressToArchive:[self uniqueArchivePath:defArc] options:o completion:^(BOOL ok){ [ws endShellOp]; }];
 }
 
 // 不覆盖的目标目录名（名/名 1/名 2…）

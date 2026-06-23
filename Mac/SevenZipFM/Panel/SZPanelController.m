@@ -142,10 +142,11 @@ NSString *const SZColID_Modified = @"modified";
     if ([_source enterFolderAtIndex:(NSUInteger)row error:&err]) { [self reload]; return YES; }
     return NO;
   }
-  // 归档内的归档项（如 .tar.gz 里的 .tar）→ 解压临时后进入嵌套层（异步，返回 NO）。
-  // 其它归档内文件双击不处理（留右键「打开」）。
+  // 归档内的归档项（如 .tar.gz 里的 .tar）→ 解压临时后进入嵌套层浏览；
+  // 其它归档内文件双击 → 解压临时 + 系统默认程序打开（对齐右键「打开」与 Windows 压缩文件夹双击）。
   if (_source.representsArchive) {
     if ([self isArchiveFile:it.name]) [self enterNestedArchiveAtRow:row];
+    else [self openArchiveFileAtRow:row];
     return NO;
   }
   NSString *fsPath = [_source fileSystemPathForIndex:(NSUInteger)row];
@@ -514,7 +515,12 @@ NSString *const SZColID_Modified = @"modified";
   if (row < 0) return;
   SZFolderItem *it = _source.items[(NSUInteger)row];
   if (it.isDirectory || !_source.representsArchive) { [self activateRow:row]; return; }
+  [self openArchiveFileAtRow:row];   // 归档内文件（含嵌套归档）→ 解压临时 + 系统打开
+}
 
+// 归档内文件 → 解压到临时目录后用系统默认程序打开（+ 登记编辑回写）。
+// 右键「打开」与归档内双击普通文件共用（双击让归档内浏览体验对齐 Windows 压缩文件夹）。
+- (void)openArchiveFileAtRow:(NSInteger)row {
   if (!self.archivePath) return;
   NSString *fullPath = [self fullArchivePathForRow:row];
   NSString *tmp = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
