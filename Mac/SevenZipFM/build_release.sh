@@ -1,5 +1,6 @@
 #!/bin/bash
-# 构建并打包 7-Zip.app 正式版：release 构建（带图标）→ 重签 → 制作 .dmg 安装包 → 安装到 /Applications。
+# 构建 7-Zip.app 正式版并安装到 /Applications：release 构建（带图标）→ 重签 → 安装。
+# 注意：本脚本不产 dmg（不在桌面留副产物）。要发版 dmg 请用 build_dmg.sh / release.sh。
 # 自用 ad-hoc 签名（不公证）。FinderSync 扩展要求 app 位于 /Applications 或 ~/Applications。
 set -euo pipefail
 FM="$(cd "$(dirname "$0")" && pwd)"
@@ -16,15 +17,7 @@ codesign --force --sign - --entitlements "$FM/Finder/Ext.entitlements" "$APPEX" 
 codesign --force --sign - "$APP" 2>/dev/null || true
 echo "  ✓"
 
-echo "==[3] 制作 .dmg 安装包 =="
-DMGSRC=/tmp/szfm_dmg; rm -rf "$DMGSRC"; mkdir -p "$DMGSRC"
-cp -R "$APP" "$DMGSRC/"
-ln -s /Applications "$DMGSRC/Applications"
-DMG="$HOME/Desktop/7-Zip.dmg"; rm -f "$DMG"
-hdiutil create -volname "7-Zip" -srcfolder "$DMGSRC" -ov -format UDZO "$DMG" >/dev/null
-echo "  ✓ $DMG"
-
-echo "==[4] 安装到 /Applications =="
+echo "==[3] 安装到 /Applications =="
 DEST=/Applications/7-Zip.app
 pkill -x SevenZipFM 2>/dev/null || true
 killall -KILL SevenZipFinder 2>/dev/null || true
@@ -45,7 +38,7 @@ pluginkit -a "$DAPPEX" 2>/dev/null || true
 pluginkit -e use -i "$BID" 2>/dev/null || true
 echo "  ✓ $DEST"
 
-echo "==[5] 刷新图标缓存 + 启动 =="
+echo "==[4] 刷新图标缓存 + 启动 =="
 killall Finder 2>/dev/null || true
 killall Dock 2>/dev/null || true
 sleep 1
@@ -53,4 +46,3 @@ open "$DEST"
 echo ""
 echo "===== 正式版打包完成 ====="
 echo "  安装位置：$DEST"
-echo "  安装包：  $DMG"
